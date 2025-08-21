@@ -1,6 +1,6 @@
 pub mod raw_source;
 
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, fmt::Display, path::Path};
 
 /// Harvest Intermediate Representation
 ///
@@ -11,7 +11,8 @@ pub struct HarvestIR {
     representations: BTreeMap<Id, Representation>,
 }
 
-pub type Id = u128;
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub struct Id(usize);
 
 /// An abstract representation of a program
 pub enum Representation {
@@ -42,16 +43,18 @@ impl HarvestIR {
         let dir = std::fs::read_dir(path)?;
         let root_dir = raw_source::RawDir::populate_from(dir)?;
         Ok(HarvestIR {
-            representations: [(0, Representation::RawSource(root_dir))].into(),
+            representations: [(Id(0), Representation::RawSource(root_dir))].into(),
         })
     }
+}
 
-    /// Print a representation of the IR to standard out.
-    pub fn display(&self) {
+impl Display for HarvestIR {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for r in self.representations.values() {
             match r {
-                Representation::RawSource(r) => r.display(0),
+                Representation::RawSource(r) => r.display(0, f)?,
             }
         }
+        Ok(())
     }
 }

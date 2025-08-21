@@ -46,7 +46,8 @@ impl RawDir {
     /// ```
     pub fn populate_from(read_dir: ReadDir) -> std::io::Result<Self> {
         let mut result = BTreeMap::default();
-        for entry in read_dir.filter_map(|e| e.ok()) {
+        for entry in read_dir {
+            let entry = entry?;
             let metadata = entry.metadata()?;
             if metadata.is_dir() {
                 let subdir = RawDir::populate_from(std::fs::read_dir(entry.path())?)?;
@@ -55,7 +56,7 @@ impl RawDir {
                 let contents = std::fs::read(entry.path())?;
                 result.insert(entry.file_name(), RawEntry::File(contents));
             } else {
-                // symlinks not yet supported... what the heck do I do with these?
+                unimplemented!("No support yet for symlinks in source project.");
             }
         }
         Ok(RawDir(result))
@@ -67,15 +68,15 @@ impl RawDir {
     ///
     /// * `level` - The level of this directory relative to the
     ///   root. Used to add padding to before entry names.
-    pub fn display(&self, level: usize) {
+    pub fn display(&self, level: usize, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let pad = "  ".repeat(level);
         for (name, entry) in self
             .0
             .iter()
             .filter_map(|(name, entry)| entry.dir().map(|e| (name, e)))
         {
-            println!("{pad}{}", name.to_string_lossy());
-            entry.display(1);
+            writeln!(f, "{pad}{}", name.to_string_lossy())?;
+            entry.display(1, f)?;
         }
 
         for (name, entry) in self
@@ -83,7 +84,8 @@ impl RawDir {
             .iter()
             .filter_map(|(name, entry)| entry.file().map(|e| (name, e)))
         {
-            println!("{pad}{} ({}B)", name.to_string_lossy(), entry.len());
+            writeln!(f, "{pad}{} ({}B)", name.to_string_lossy(), entry.len())?;
         }
+        Ok(())
     }
 }
