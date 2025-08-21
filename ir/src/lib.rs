@@ -30,7 +30,13 @@ impl HarvestIR {
     /// # Examples
     ///
     /// ```
-    /// let harvest_ir = HarvestIR::from_raw_source("~/code/some_c_project/")?;
+    /// # use harvest_ir::HarvestIR;
+    /// # fn main() -> std::io::Result<()> {
+    /// # let dir = tempdir::TempDir::new("harvest_test")?;
+    /// # let path = dir.path();
+    /// let harvest_ir = HarvestIR::from_raw_source(path)?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn from_raw_source<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let dir = std::fs::read_dir(path)?;

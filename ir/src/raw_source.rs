@@ -27,8 +27,25 @@ pub struct RawDir(BTreeMap<OsString, RawEntry>);
 
 impl RawDir {
     /// Create a [RawDir] from a local file system directory
+    ///
+    /// # Arguments
+    ///
+    /// * `read_dir` - a [ReadDir] iterator over a file-system
+    ///   directory.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use harvest_ir::raw_source::RawDir;
+    /// # fn main() -> std::io::Result<()> {
+    /// # let dir = tempdir::TempDir::new("harvest_test")?;
+    /// # let path = dir.path();
+    /// let raw_dir = RawDir::populate_from(std::fs::read_dir(path)?)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn populate_from(read_dir: ReadDir) -> std::io::Result<Self> {
-	let mut result = BTreeMap::default();
+        let mut result = BTreeMap::default();
         for entry in read_dir.filter_map(|e| e.ok()) {
             let metadata = entry.metadata()?;
             if metadata.is_dir() {
@@ -49,7 +66,7 @@ impl RawDir {
     /// # Arguments
     ///
     /// * `level` - The level of this directory relative to the
-    ///             root. Used to add padding to before entry names.
+    ///   root. Used to add padding to before entry names.
     pub fn display(&self, level: usize) {
         let pad = "  ".repeat(level);
         for (name, entry) in self
