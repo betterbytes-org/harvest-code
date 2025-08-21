@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::path::PathBuf;
 
-#[derive(Parser)]
+#[derive(Debug, Parser)]
 pub struct Args {
     // Currently, this is the only input format supported, so --in_performer is
     // required. However, in the future, we'll want to be able to take a
@@ -12,5 +12,5 @@ pub struct Args {
     /// Path to the C code to translate. This path should be a directory in the
     /// project structure defined by the TRACTOR_Performers library.
     #[arg(long)]
-    in_performer: PathBuf,
+    pub in_performer: PathBuf,
 }
