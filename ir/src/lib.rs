@@ -8,6 +8,12 @@ use std::{collections::BTreeMap, fmt::Display, path::Path};
 /// program. Transformations of the IR may add or modify
 /// representations.
 pub struct HarvestIR {
+    // The IR is composed of a set of [Representation]s identified by
+    // some [Id] that is unique to that [Resentation] (at least for a
+    // particular run of the pipeline). There may or may not be a
+    // useful ordering for [Id]s, but for now using an ordered map at
+    // least gives us a stable ordering when iterating, e.g. to print
+    // the IR.
     representations: BTreeMap<Id, Representation>,
 }
 
