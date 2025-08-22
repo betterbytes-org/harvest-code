@@ -1,3 +1,4 @@
+pub mod c_ast;
 pub mod raw_source;
 
 use std::{collections::BTreeMap, fmt::Display, path::Path};
@@ -18,7 +19,7 @@ pub struct HarvestIR {
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
-pub struct Id(usize);
+pub struct Id(pub usize);
 
 /// An abstract representation of a program
 pub enum Representation {
@@ -51,6 +52,10 @@ impl HarvestIR {
         Ok(HarvestIR {
             representations: [(Id(0), Representation::RawSource(root_dir))].into(),
         })
+    }
+
+    pub fn get(&self, id: &Id) -> Option<&Representation> {
+        self.representations.get(id)
     }
 }
 
