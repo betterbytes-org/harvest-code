@@ -23,7 +23,7 @@ impl RawEntry {
 }
 
 /// A representation of a file-system directory tree.
-pub struct RawDir(BTreeMap<OsString, RawEntry>);
+pub struct RawDir(pub BTreeMap<OsString, RawEntry>);
 
 impl RawDir {
     /// Create a [RawDir] from a local file system directory
