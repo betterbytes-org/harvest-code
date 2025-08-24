@@ -1,4 +1,4 @@
-pub mod c_ast;
+pub mod c2rust_c_ast;
 pub mod raw_source;
 
 use std::{collections::BTreeMap, fmt::Display, path::Path};

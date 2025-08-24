@@ -6,7 +6,7 @@ use c2rust_transpile::c_ast::{ConversionContext, TypedAstContext};
 use crate::raw_source::{RawDir, RawEntry};
 
 #[derive(Debug)]
-pub struct CAst {
+pub struct C2RustCAst {
     _ast: TypedAstContext,
 }
 
@@ -32,8 +32,8 @@ fn populate_from(src: &RawDir, base: &Path, prefix: &Path) -> Option<AstContext>
     None
 }
 
-impl CAst {
-    pub fn populate_from(src: &RawDir) -> Option<CAst> {
+impl C2RustCAst {
+    pub fn populate_from(src: &RawDir) -> Option<C2RustCAst> {
         fn reify(src: &RawDir, dir: &Path) -> std::io::Result<()> {
             for (name, entry) in src.0.iter() {
                 match entry {
@@ -55,4 +55,25 @@ impl CAst {
             _ast: ConversionContext::new(&ac).typed_context,
         })
     }
+
+    pub fn tree_crawl(&self) {
+        tree_crawl::read_root(&self._ast);
+    }
 }
+
+mod tree_crawl {
+    use c2rust_transpile::c_ast::*;
+
+    pub fn read_root(ctxt : &TypedAstContext) {
+        //let implicit_toplvls : Vec<CDeclId>
+        // iterate over the top-level declarations
+        for decl_id in ctxt.c_decls_top.iter() {
+            let decl = ctxt.get_decl(decl_id).unwrap();
+            let contents = &decl.kind;
+            println!("{decl_id:?}:\n  {contents:?}");
+        }
+    }
+}
+
+
+
