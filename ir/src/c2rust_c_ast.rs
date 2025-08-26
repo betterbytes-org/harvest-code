@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct C2RustCAst {
+pub struct CAst {
     _ast: Vec<TypedAstContext>,
 }
 
@@ -46,7 +46,7 @@ impl Representation for CAst {
     }
 }
 
-impl C2RustCAst {
+impl CAst {
     pub fn run_stage<'a>(ir: HarvestIR) -> Option<CAst> {
         for repr in ir.representations.values() {
             if let Some(r) = repr.as_any().downcast_ref::<RawDir>() {
@@ -56,7 +56,7 @@ impl C2RustCAst {
         None
     }
 
-    pub fn populate_from(src: &RawDir) -> Option<C2RustCAst> {
+    pub fn populate_from(src: &RawDir) -> Option<CAst> {
         fn reify(src: &RawDir, dir: &Path) -> std::io::Result<()> {
             for (name, entry) in src.0.iter() {
                 match entry {
