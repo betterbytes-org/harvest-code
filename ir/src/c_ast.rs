@@ -1,11 +1,8 @@
+use serde::{Deserialize, Serialize};
 use std::{
-    any::Any,
-    fmt::Display,
-    path::Path,
-    process::Command,
+    any::Any, fmt::Display, fs::File, path::{Path, PathBuf}, process::Command
 };
 
-use c2rust_ast_exporter::clang_ast::AstContext;
 use c2rust_transpile::c_ast::{ConversionContext, TypedAstContext};
 
 use crate::{
@@ -15,29 +12,26 @@ use crate::{
 
 #[derive(Debug)]
 pub struct CAst {
-    _ast: TypedAstContext,
+    _ast: Vec<TypedAstContext>,
 }
 
-fn populate_from(src: &RawDir, base: &Path, prefix: &Path) -> Option<AstContext> {
-    for (name, entry) in src.0.iter() {
-        let full_path = prefix.join(name);
-        match entry {
-            RawEntry::File(_) => {
-                if !name.as_encoded_bytes().ends_with(b".c") {
-                    continue;
-                }
-                let untyped_ast =
-                    c2rust_ast_exporter::get_untyped_ast(&full_path, base, &[], false).unwrap();
-                return Some(untyped_ast);
-            }
-            RawEntry::Dir(subdir) => {
-                if let Some(res) = populate_from(subdir, base, &prefix.join(name)) {
-                    return Some(res);
-                }
-            }
-        }
-    }
-    None
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+struct CompileCmd {
+    /// The working directory of the compilation. All paths specified in the command
+    /// or file fields must be either absolute or relative to this directory.
+    pub directory: PathBuf,
+    /// The main translation unit source processed by this compilation step. This is
+    /// used by tools as the key into the compilation database. There can be multiple
+    /// command objects for the same file, for example if the same source file is compiled
+    /// with different configurations.
+    pub file: PathBuf,
+}
+
+fn populate_from(base: &Path) -> Vec<TypedAstContext> {
+    let v: Vec<CompileCmd> = serde_json::from_reader(std::io::BufReader::new(File::open(base.join("compile_commands.json")).unwrap())).unwrap();
+    v.iter().map(|cc| {
+	ConversionContext::new(&c2rust_ast_exporter::get_untyped_ast(&cc.file, base, &[], false).unwrap()).typed_context
+    }).collect()
 }
 
 impl Display for CAst {
@@ -93,8 +87,8 @@ impl CAst {
             .arg(cc_dir.path())
             .output()
             .ok()?;
-        populate_from(src, cc_dir.path(), td.path()).map(|ac| Self {
-            _ast: ConversionContext::new(&ac).typed_context,
+	Some(Self {
+	    _ast: populate_from(cc_dir.path())
         })
     }
 }
