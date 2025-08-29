@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 // practice, we run on 64-bit systems, so that matches usize anyway). NonZeroU64
 // is used to make Option<Id> smaller, because it's easy and doesn't have a
 // downside.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Id(NonZeroU64);
 
 impl Id {
