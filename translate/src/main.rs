@@ -1,13 +1,19 @@
 mod cli;
-mod tool;
+mod scheduler;
+mod tools;
 
 use clap::Parser as _;
 use cli::Args;
-use harvest_ir::HarvestIR;
+use scheduler::Scheduler;
+use tools::{ToolInvocation, load_raw_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let harvest_ir = HarvestIR::from_raw_source(args.in_performer)?;
-    println!("{harvest_ir}");
+    let mut scheduler = Scheduler::default();
+    scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
+        directory: args.in_performer,
+    }));
+    scheduler.main_loop();
+    println!("{}", scheduler.ir_snapshot());
     Ok(())
 }
