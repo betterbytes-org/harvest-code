@@ -1,11 +1,11 @@
 pub mod abstractops;
-pub mod rustbackends;
 pub mod cost;
+pub mod rustbackends;
 
 // TODOS (not necessarily in this order)
 // --------------------------------------
 // TODO: diagnostics for failed struct selection
-// TODO: cost analysis
+// TODO: test cost analysis once we have a struct that could be ruled out by cost
 // TODO: write up some good example to justify design
 // TODO: test against real-world C structures.
 // TODO: expand spec to include structures modeled by other tools (take inspiration from Dafny, Hanoi, etc)
@@ -23,6 +23,12 @@ pub struct TranslationCtx {
     backends: Vec<RustBackend>,
 }
 
+impl Default for TranslationCtx {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TranslationCtx {
     pub fn new() -> Self {
         Self {
@@ -34,12 +40,21 @@ impl TranslationCtx {
     /// Selects an appropriate backend according to the following validity properties:
     /// Constraints:
     /// 1. Interface satisfaction: RustBackend must implement all AbstractOp in CAnalysisResult
+    /// 2. Performance: Every Abstractop in Rustbackend should be at least as efficient as CanalysisResult
     pub fn select_rust_struct(&self, c_analysis_result: CAnalysisResult) -> Vec<RustBackendLabel> {
         log::info!("Selecting Rust backend for {}", c_analysis_result.name);
-        let selected_backends = self
+        let valid_backends: Vec<&RustBackend> = self
             .backends
             .iter()
             .filter(|backend| backend.implements_all(&c_analysis_result.ops))
+            .collect();
+        log::info!(
+            "Filtered based on validity constraints to: {:?}",
+            valid_backends
+        );
+        // Return the labels of the valid backends
+        let selected_backends: Vec<RustBackendLabel> = valid_backends
+            .iter()
             .map(|backend| backend.label.clone())
             .collect();
         log::info!("Selected Rust backends: {:?}", selected_backends);

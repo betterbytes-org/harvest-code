@@ -1,4 +1,5 @@
-use crate::abstractops::AbstractOp;
+use crate::abstractops::{AbstractOp, AbstractOpLabel};
+use crate::cost::Cost;
 
 /// The orthodox Rust data structures that we will translate to
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -7,22 +8,37 @@ pub enum RustBackendLabel {
     VecDeque,
 }
 
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct RustBackend {
     pub label: RustBackendLabel,
     pub ops: Vec<AbstractOp>,
 }
 
 impl RustBackend {
-    /// Check if this RustBackend implements the given abstract operation
+    /// Check if this RustBackend implements the given abstract operations
+    /// Only considers operation labels, ignores cost
     pub fn implements_all(&self, ops: &[AbstractOp]) -> bool {
-        ops.iter().all(|op| self.ops.contains(op))
+        ops.iter().all(|required_op| {
+            self.ops
+                .iter()
+                .any(|backend_op| backend_op.label == required_op.label)
+        })
     }
 
     /// Hardcoded Vec backend
     pub fn vec() -> Self {
         Self {
             label: RustBackendLabel::Vec,
-            ops: vec![AbstractOp::PushBack, AbstractOp::PopBack],
+            ops: vec![
+                AbstractOp {
+                    label: AbstractOpLabel::PushBack,
+                    cost: Cost::new(0, false), // O(1) amortized
+                },
+                AbstractOp {
+                    label: AbstractOpLabel::PopBack,
+                    cost: Cost::new(0, false), // O(1)
+                },
+            ],
         }
     }
 
@@ -31,10 +47,22 @@ impl RustBackend {
         Self {
             label: RustBackendLabel::VecDeque,
             ops: vec![
-                AbstractOp::PushFront,
-                AbstractOp::PushBack,
-                AbstractOp::PopFront,
-                AbstractOp::PopBack,
+                AbstractOp {
+                    label: AbstractOpLabel::PushFront,
+                    cost: Cost::new(0, false), // O(1) amortized
+                },
+                AbstractOp {
+                    label: AbstractOpLabel::PushBack,
+                    cost: Cost::new(0, false), // O(1) amortized
+                },
+                AbstractOp {
+                    label: AbstractOpLabel::PopFront,
+                    cost: Cost::new(0, false), // O(1)
+                },
+                AbstractOp {
+                    label: AbstractOpLabel::PopBack,
+                    cost: Cost::new(0, false), // O(1)
+                },
             ],
         }
     }
