@@ -2,7 +2,7 @@ use crate::abstractops::{AbstractOp, AbstractOpLabel};
 use crate::cost::Cost;
 
 /// The orthodox Rust data structures that we will translate to
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 pub enum RustBackendLabel {
     Vec,
     VecDeque,
@@ -22,6 +22,14 @@ impl RustBackend {
             self.ops
                 .iter()
                 .any(|backend_op| backend_op.label == required_op.label)
+        })
+    }
+
+    pub fn implements_all_efficiently(&self, ops: &[AbstractOp]) -> bool {
+        ops.iter().all(|required_op| {
+            self.ops.iter().any(|backend_op| {
+                backend_op.label == required_op.label && backend_op.cost <= required_op.cost
+            })
         })
     }
 

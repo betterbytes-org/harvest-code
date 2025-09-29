@@ -80,3 +80,61 @@ fn test_only_vecdeque_matches() {
     assert_eq!(rust_backends.len(), 1);
     assert_eq!(rust_backends[0], RustBackendLabel::VecDeque);
 }
+
+#[test]
+fn test_backend_ruled_out_by_cost() {
+    use harvest_struct_selection::{
+        AbstractOp, AbstractOpLabel, CAnalysisResult, RustBackend, RustBackendLabel, cost::Cost,
+    };
+    setup_logger();
+    // Define a Dumbstack backend with linear push_back and constant pop_back
+    #[derive(Debug, Clone)]
+    struct DumbstackBackend;
+    impl DumbstackBackend {
+        fn backend() -> RustBackend {
+            RustBackend {
+                label: RustBackendLabel::Vec, // Use a dummy label or add a new one if needed
+                ops: vec![
+                    AbstractOp {
+                        label: AbstractOpLabel::PushBack,
+                        cost: Cost::new(1, false), // O(N)
+                    },
+                    AbstractOp {
+                        label: AbstractOpLabel::PopBack,
+                        cost: Cost::new(0, false), // O(1)
+                    },
+                ],
+            }
+        }
+    }
+
+    // Required: O(1) push_back and O(1) pop_back
+    let required_ops = vec![
+        AbstractOp {
+            label: AbstractOpLabel::PushBack,
+            cost: Cost::new(0, false), // O(1)
+        },
+        AbstractOp {
+            label: AbstractOpLabel::PopBack,
+            cost: Cost::new(0, false), // O(1)
+        },
+    ];
+
+    // Compose a TranslationCtx with only Dumbstack using from_rust_backends
+    let ctx =
+        harvest_struct_selection::TranslationCtx::from_rust_backends(
+            &[DumbstackBackend::backend()],
+        );
+
+    let c_analysis_result = CAnalysisResult {
+        name: "stacklike_struct".to_string(),
+        ops: required_ops,
+    };
+
+    let rust_backends = ctx.select_rust_struct(c_analysis_result);
+    // Dumbstack should be ruled out due to slow push_back
+    assert!(
+        rust_backends.is_empty(),
+        "Dumbstack should not be selected due to cost"
+    );
+}

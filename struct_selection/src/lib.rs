@@ -36,6 +36,12 @@ impl TranslationCtx {
         }
     }
 
+    pub fn from_rust_backends(backends: &[RustBackend]) -> Self {
+        Self {
+            backends: backends.to_vec(),
+        }
+    }
+
     /// Solve constraints presented in the CAnalysisResult
     /// Selects an appropriate backend according to the following validity properties:
     /// Constraints:
@@ -43,21 +49,16 @@ impl TranslationCtx {
     /// 2. Performance: Every Abstractop in Rustbackend should be at least as efficient as CanalysisResult
     pub fn select_rust_struct(&self, c_analysis_result: CAnalysisResult) -> Vec<RustBackendLabel> {
         log::info!("Selecting Rust backend for {}", c_analysis_result.name);
-        let valid_backends: Vec<&RustBackend> = self
+        let valid_backends: Vec<RustBackendLabel> = self
             .backends
             .iter()
-            .filter(|backend| backend.implements_all(&c_analysis_result.ops))
+            .filter(|backend| backend.implements_all_efficiently(&c_analysis_result.ops))
+            .map(|backend| backend.label)
             .collect();
         log::info!(
             "Filtered based on validity constraints to: {:?}",
             valid_backends
         );
-        // Return the labels of the valid backends
-        let selected_backends: Vec<RustBackendLabel> = valid_backends
-            .iter()
-            .map(|backend| backend.label.clone())
-            .collect();
-        log::info!("Selected Rust backends: {:?}", selected_backends);
-        selected_backends
+        valid_backends
     }
 }
