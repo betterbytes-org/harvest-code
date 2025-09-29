@@ -1,13 +1,14 @@
 pub mod abstractops;
 pub mod rustbackends;
+pub mod cost;
 
 // TODOS (not necessarily in this order)
 // --------------------------------------
 // TODO: diagnostics for failed struct selection
 // TODO: cost analysis
-// TODO: formalize semantics of AbstractOps
 // TODO: write up some good example to justify design
 // TODO: test against real-world C structures.
+// TODO: expand spec to include structures modeled by other tools (take inspiration from Dafny, Hanoi, etc)
 
 // Design goals:
 // 1. Easy to extend with new AbstractOps and Rust backends
