@@ -1,0 +1,8 @@
+[package]
+name = "harvest_struct_selection"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+harvest_ir = { workspace = true }
+
