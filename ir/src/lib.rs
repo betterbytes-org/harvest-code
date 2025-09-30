@@ -24,6 +24,9 @@ pub struct HarvestIR {
 
 /// An abstract representation of a program
 pub enum Representation {
+    /// A cargo package, ready to be built with `cargo build`.
+    CargoPackage(fs::RawDir),
+
     /// An verbatim copy of the original source code project's
     /// directories and files.
     RawSource(fs::RawDir),
@@ -37,13 +40,25 @@ impl HarvestIR {
             }
         }
     }
+
+    /// Returns an iterator over the IDs and representations in this IR.
+    pub fn iter(&self) -> impl Iterator<Item = (Id, &Representation)> {
+        self.representations.iter().map(|(&id, repr)| (id, &**repr))
+    }
 }
 
 impl Display for HarvestIR {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for r in self.representations.values() {
             match r.deref() {
-                Representation::RawSource(r) => r.display(0, f)?,
+                Representation::CargoPackage(r) => {
+                    writeln!(f, "Cargo package:")?;
+                    r.display(0, f)?
+                }
+                Representation::RawSource(r) => {
+                    writeln!(f, "Raw C source:")?;
+                    r.display(0, f)?
+                }
             }
         }
         Ok(())

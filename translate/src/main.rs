@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
         directory: args.in_performer,
     }));
+    scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
     scheduler.main_loop();
     println!("{}", scheduler.ir_snapshot());
     Ok(())
