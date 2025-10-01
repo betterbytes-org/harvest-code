@@ -1,3 +1,6 @@
+//! Type representing a filesystem. Example use cases: representing a C source project, a Cargo
+//! project, etc.
+
 use std::{collections::BTreeMap, ffi::OsString, fs::ReadDir};
 
 /// A representation of a file-system directory entry.
@@ -36,7 +39,7 @@ impl RawDir {
     /// # Examples
     ///
     /// ```
-    /// # use harvest_ir::raw_source::RawDir;
+    /// # use harvest_ir::fs::RawDir;
     /// # fn main() -> std::io::Result<()> {
     /// # let dir = tempdir::TempDir::new("harvest_test")?;
     /// # let path = dir.path();

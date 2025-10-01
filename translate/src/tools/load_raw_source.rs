@@ -1,7 +1,7 @@
 //! Lifts a source code project into a RawSource representation.
 
 use crate::tools::{Context, Tool};
-use harvest_ir::{HarvestIR, Id, Representation, raw_source::RawDir};
+use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
 use std::{fs::read_dir, path::PathBuf};
 
 pub struct Args {
