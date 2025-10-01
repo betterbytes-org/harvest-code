@@ -1,6 +1,6 @@
 pub mod edit;
+pub mod fs;
 mod id;
-pub mod raw_source;
 
 pub use edit::Edit;
 pub use id::Id;
@@ -26,7 +26,7 @@ pub struct HarvestIR {
 pub enum Representation {
     /// An verbatim copy of the original source code project's
     /// directories and files.
-    RawSource(raw_source::RawDir),
+    RawSource(fs::RawDir),
 }
 
 impl HarvestIR {
@@ -53,7 +53,7 @@ impl Display for HarvestIR {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::raw_source::RawDir;
+    use crate::fs::RawDir;
     use std::fs::read_dir;
     use tempdir::TempDir;
 
