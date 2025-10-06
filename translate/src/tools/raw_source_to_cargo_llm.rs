@@ -6,7 +6,7 @@ use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
 use llm::chat::{ChatMessage, StructuredOutputFormat};
 use serde::Deserialize;
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, str::FromStr};
 
 pub struct RawSourceToCargoLlm;
 
@@ -20,13 +20,17 @@ impl Tool for RawSourceToCargoLlm {
         let in_dir = raw_source(&context.ir_snapshot).unwrap();
 
         // Use the llm crate to connect to Ollama.
+
         // TODO: This address belongs in a config file (issue #14).
+        let llm_backend =
+            LLMBackend::from_str(env::var("LLM_BACKEND").as_deref().unwrap_or("ollama"))
+                .expect("Unknown LLM_BACKEND");
         let ollama_addr = env::var("OLLAMA_ADDR").unwrap_or("[::1]:11434".into());
         let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
         let llm = LLMBuilder::new()
-            .backend(LLMBackend::Ollama)
+            .backend(llm_backend)
             .base_url(format!("http://{ollama_addr}"))
-            .model("codellama:7b")
+            .model(env::var("LLM_MODEL").unwrap_or("codellama:7b".into()))
             .max_tokens(100000)
             .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
             .schema(output_format)
@@ -76,12 +80,10 @@ impl Tool for RawSourceToCargoLlm {
 /// Returns the RawSource representation in IR. If there are multiple RawSource representations,
 /// returns an arbitrary one.
 fn raw_source(ir: &HarvestIR) -> Option<&RawDir> {
-    for (_, repr) in ir.iter() {
-        if let Representation::RawSource(repr) = repr {
-            return Some(repr);
-        }
-    }
-    None
+    ir.iter().find_map(|(_, repr)| match repr {
+        Representation::RawSource(r) => Some(r),
+        _ => None,
+    })
 }
 
 /// Structure representing a file created by the LLM.
