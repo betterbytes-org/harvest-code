@@ -1,4 +1,5 @@
 pub mod load_raw_source;
+pub mod raw_source_to_cargo_llm;
 
 use harvest_ir::{Edit, HarvestIR, Id};
 use std::sync::Arc;
@@ -6,12 +7,14 @@ use std::sync::Arc;
 /// A tool invocation that the scheduler could choose to perform.
 pub enum ToolInvocation {
     LoadRawSource(load_raw_source::Args),
+    RawSourceToCargoLlm,
 }
 
 impl ToolInvocation {
     pub fn create_tool(&self) -> Box<dyn Tool> {
         match self {
             Self::LoadRawSource(args) => Box::new(load_raw_source::LoadRawSource::new(args)),
+            Self::RawSourceToCargoLlm => Box::new(raw_source_to_cargo_llm::RawSourceToCargoLlm),
         }
     }
 }
@@ -31,7 +34,7 @@ impl ToolInvocation {
 /// chooses to invoke. Tool is also intentionally dyn compatible.
 pub trait Tool: Send {
     /// Returns the IDs this tool may write, or `None` if it is unable to run on
-    /// on this PR.
+    /// on this IR.
     ///
     /// The IDs returned may depend on the tool constructor's arguments as well
     /// as the contents of `ir`. Reasons might_write might return `None` include
