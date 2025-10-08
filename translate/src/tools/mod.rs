@@ -1,8 +1,26 @@
 pub mod load_raw_source;
 pub mod raw_source_to_cargo_llm;
 
+use crate::cli::unknown_field_warning;
 use harvest_ir::{Edit, HarvestIR, Id};
-use std::sync::Arc;
+use serde::Deserialize;
+use serde_json::Value;
+use std::{collections::HashMap, sync::Arc};
+
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
+
+    #[serde(flatten)]
+    unknown: HashMap<String, Value>,
+}
+
+impl Config {
+    pub fn validate(&self) {
+        unknown_field_warning("tools", &self.unknown);
+        self.raw_source_to_cargo_llm.validate();
+    }
+}
 
 /// A tool invocation that the scheduler could choose to perform.
 pub enum ToolInvocation {

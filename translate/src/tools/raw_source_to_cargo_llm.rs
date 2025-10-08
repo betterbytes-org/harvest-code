@@ -1,12 +1,14 @@
 //! Attempts to directly turn a C project into a Cargo project by throwing it at
 //! an LLM via the `llm` crate.
 
+use crate::cli::{get_config, unknown_field_warning};
 use crate::tools::{Context, Tool};
 use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
 use llm::chat::{ChatMessage, StructuredOutputFormat};
 use serde::Deserialize;
-use std::{env, path::PathBuf, str::FromStr};
+use serde_json::Value;
+use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
 pub struct RawSourceToCargoLlm;
 
@@ -17,20 +19,17 @@ impl Tool for RawSourceToCargoLlm {
     }
 
     fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>> {
+        let config = get_config();
+        let config = &config.tools.raw_source_to_cargo_llm;
         let in_dir = raw_source(&context.ir_snapshot).unwrap();
 
         // Use the llm crate to connect to Ollama.
 
-        // TODO: This address belongs in a config file (issue #14).
-        let llm_backend =
-            LLMBackend::from_str(env::var("LLM_BACKEND").as_deref().unwrap_or("ollama"))
-                .expect("Unknown LLM_BACKEND");
-        let ollama_addr = env::var("OLLAMA_ADDR").unwrap_or("[::1]:11434".into());
         let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
         let llm = LLMBuilder::new()
-            .backend(llm_backend)
-            .base_url(format!("http://{ollama_addr}"))
-            .model(env::var("LLM_MODEL").unwrap_or("codellama:7b".into()))
+            .backend(LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND"))
+            .base_url(format!("http://{}", config.address))
+            .model(&config.model)
             .max_tokens(100000)
             .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
             .schema(output_format)
@@ -74,6 +73,27 @@ impl Tool for RawSourceToCargoLlm {
             .ir_edit
             .add_representation(Representation::CargoPackage(out_dir));
         Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    /// Hostname and port at which to find the LLM serve. Example: [::1]:11434
+    address: String,
+
+    /// Which backend to use, e.g. "ollama".
+    backend: String,
+
+    /// Name of the model to invoke.
+    model: String,
+
+    #[serde(flatten)]
+    unknown: HashMap<String, Value>,
+}
+
+impl Config {
+    pub fn validate(&self) {
+        unknown_field_warning("tools.raw_source_to_cargo_llm", &self.unknown);
     }
 }
 
