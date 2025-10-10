@@ -47,6 +47,8 @@ impl RawDir {
     ///
     /// ```
     /// # use harvest_ir::fs::RawDir;
+    /// # #[cfg(miri)] fn main() {}
+    /// # #[cfg(not(miri))]
     /// # fn main() -> std::io::Result<()> {
     /// # let dir = tempdir::TempDir::new("harvest_test")?;
     /// # let path = dir.path();
