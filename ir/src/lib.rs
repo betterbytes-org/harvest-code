@@ -69,16 +69,11 @@ impl Display for HarvestIR {
 mod tests {
     use super::*;
     use crate::fs::RawDir;
-    use std::fs::read_dir;
-    use tempdir::TempDir;
 
     /// Returns a new Representation (for code that needs a Representation but
     /// doesn't care what it is).
     pub(crate) fn new_representation() -> Representation {
-        Representation::RawSource(
-            RawDir::populate_from(read_dir(TempDir::new("harvest_test").unwrap().path()).unwrap())
-                .unwrap(),
-        )
+        Representation::RawSource(RawDir::default())
     }
 
     #[test]
