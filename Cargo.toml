@@ -4,3 +4,4 @@ resolver = "3"
 
 [workspace.dependencies]
 harvest_ir = { path = "ir" }
+tempfile = "3.23.0"

@@ -2,16 +2,20 @@ mod cli;
 mod scheduler;
 mod tools;
 
-use clap::Parser as _;
-use cli::Args;
+#[cfg(test)]
+mod test_util;
+
+use cli::get_config;
 use scheduler::Scheduler;
 use tools::{ToolInvocation, load_raw_source};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+    if cli::initialize() {
+        return Ok(()); // An early-exit argument was passed.
+    }
     let mut scheduler = Scheduler::default();
     scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
-        directory: args.in_performer,
+        directory: get_config().in_performer.clone(),
     }));
     scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
     scheduler.main_loop();

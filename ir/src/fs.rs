@@ -50,7 +50,7 @@ impl RawDir {
     /// # #[cfg(miri)] fn main() {}
     /// # #[cfg(not(miri))]
     /// # fn main() -> std::io::Result<()> {
-    /// # let dir = tempdir::TempDir::new("harvest_test")?;
+    /// # let dir = tempfile::tempdir().unwrap();
     /// # let path = dir.path();
     /// let raw_dir = RawDir::populate_from(std::fs::read_dir(path)?)?;
     /// # Ok(())
