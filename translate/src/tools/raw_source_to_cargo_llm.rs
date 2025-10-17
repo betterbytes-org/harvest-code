@@ -25,6 +25,31 @@ impl Tool for RawSourceToCargoLlm {
 
         // Use the llm crate to connect to Ollama.
 
+	let system_prompt = r#"
+You are a code translation tool. You translate provided C projects into a Rust projects including Cargo manifest. For example, given the following prompt:
+
+Please translate the following C project into a Rust project including Cargo manifest:
+
+main.c contains:
+#include <stdio.h>
+
+int main() {
+  return 0;
+}
+
+You should return:
+[
+{
+  "path": "src/main.rs",
+  "contents": "fn main() {\n\n}",
+},
+{
+  "path": "Cargo.toml",
+  "contents": "[package]\nname = "noop"\nversion = "0.1.0"\nedition = "2024"\n\n[dependencies]\n"
+}
+]
+	"#;
+
         let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
         let llm = LLMBuilder::new()
             .backend(LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND"))
@@ -33,7 +58,7 @@ impl Tool for RawSourceToCargoLlm {
             .max_tokens(100000)
             .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
             .schema(output_format)
-            .system("You are a code translation tool. Please translate the provided C project into a Rust project including Cargo manifest.")
+            .system(system_prompt)
             .build()
             .expect("Failed to build LLM (Ollama)");
 
