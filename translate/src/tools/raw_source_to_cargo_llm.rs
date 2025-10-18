@@ -10,6 +10,12 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
 
+/// Structured output JSON schema for Ollama.
+const STRUCTURED_OUTPUT_SCHEMA: &str =
+    include_str!("raw_source_to_cargo_llm/structured_schema.json");
+
+const SYSTEM_PROMPT: &str = include_str!("raw_source_to_cargo_llm/system_prompt.txt");
+
 pub struct RawSourceToCargoLlm;
 
 impl Tool for RawSourceToCargoLlm {
@@ -25,31 +31,6 @@ impl Tool for RawSourceToCargoLlm {
 
         // Use the llm crate to connect to Ollama.
 
-	let system_prompt = r#"
-You are a code translation tool. You translate provided C projects into a Rust projects including Cargo manifest. For example, given the following prompt:
-
-Please translate the following C project into a Rust project including Cargo manifest:
-
-main.c contains:
-#include <stdio.h>
-
-int main() {
-  return 0;
-}
-
-You should return:
-[
-{
-  "path": "src/main.rs",
-  "contents": "fn main() {\n\n}",
-},
-{
-  "path": "Cargo.toml",
-  "contents": "[package]\nname = "noop"\nversion = "0.1.0"\nedition = "2024"\n\n[dependencies]\n"
-}
-]
-	"#;
-
         let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
         let llm = LLMBuilder::new()
             .backend(LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND"))
@@ -58,7 +39,7 @@ You should return:
             .max_tokens(100000)
             .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
             .schema(output_format)
-            .system(system_prompt)
+            .system(SYSTEM_PROMPT)
             .build()
             .expect("Failed to build LLM (Ollama)");
 
@@ -137,19 +118,3 @@ struct OutputFile {
     contents: String,
     path: PathBuf,
 }
-
-/// Structured output JSON schema for Ollama.
-const STRUCTURED_OUTPUT_SCHEMA: &str = r#"{
-    "name": "file",
-    "schema": {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "properties": {
-                "path": { "type": "string" },
-                "contents": { "type": "string"}
-            },
-            "required": ["path", "contents"]
-        }
-    }
-}"#;

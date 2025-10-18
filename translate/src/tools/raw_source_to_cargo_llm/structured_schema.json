@@ -1,0 +1,14 @@
+{
+    "name": "file",
+    "schema": {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {
+                "path": { "type": "string" },
+                "contents": { "type": "string"}
+            },
+            "required": ["path", "contents"]
+        }
+    }
+}
