@@ -4,7 +4,7 @@ mod id;
 
 pub use edit::Edit;
 pub use id::Id;
-use std::{collections::BTreeMap, fmt::Display, ops::Deref, sync::Arc};
+use std::{collections::BTreeMap, fmt::Display, ops::Deref, path::Path, sync::Arc};
 
 /// Harvest Intermediate Representation
 ///
@@ -30,6 +30,21 @@ pub enum Representation {
     /// An verbatim copy of the original source code project's
     /// directories and files.
     RawSource(fs::RawDir),
+}
+
+impl Representation {
+    /// Materialize the [Representation] to a directory at the
+    /// provided `path`.
+    ///
+    /// Materializing stores an on-disk version of the
+    /// [Representation]. The format is specific to each
+    /// [Representation] variant.
+    pub fn materialize<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+        match self {
+            Representation::CargoPackage(raw_dir) => raw_dir.materialize(path),
+            Representation::RawSource(raw_dir) => raw_dir.materialize(path),
+        }
+    }
 }
 
 impl HarvestIR {
