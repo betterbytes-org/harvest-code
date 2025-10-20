@@ -1,6 +1,7 @@
 # The default configurations options for harvest_translate.
 
 [tools.raw_source_to_cargo_llm]
-address = "[::1]:11434"
+address = "http://localhost:11434"
 backend = "ollama"
 model = "codellama:7b"
+max_tokens = 10000

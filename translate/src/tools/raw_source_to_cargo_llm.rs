@@ -6,9 +6,15 @@ use crate::tools::{Context, Tool};
 use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
 use llm::chat::{ChatMessage, StructuredOutputFormat};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, path::PathBuf, str::FromStr};
+
+/// Structured output JSON schema for Ollama.
+const STRUCTURED_OUTPUT_SCHEMA: &str =
+    include_str!("raw_source_to_cargo_llm/structured_schema.json");
+
+const SYSTEM_PROMPT: &str = include_str!("raw_source_to_cargo_llm/system_prompt.txt");
 
 pub struct RawSourceToCargoLlm;
 
@@ -26,26 +32,40 @@ impl Tool for RawSourceToCargoLlm {
         // Use the llm crate to connect to Ollama.
 
         let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
-        let llm = LLMBuilder::new()
-            .backend(LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND"))
-            .base_url(format!("http://{}", config.address))
-            .model(&config.model)
-            .max_tokens(100000)
-            .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
-            .schema(output_format)
-            .system("You are a code translation tool. Please translate the provided C project into a Rust project including Cargo manifest.")
-            .build()
-            .expect("Failed to build LLM (Ollama)");
+        let llm = {
+            let mut llm_builder = LLMBuilder::new()
+                .backend(LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND"))
+                .model(&config.model)
+                .max_tokens(config.max_tokens)
+                .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
+                .schema(output_format)
+                .system(SYSTEM_PROMPT);
+
+            if let Some(ref address) = config.address
+                && !address.is_empty()
+            {
+                llm_builder = llm_builder.base_url(address);
+            }
+            if let Some(ref api_key) = config.api_key
+                && !api_key.is_empty()
+            {
+                llm_builder = llm_builder.api_key(api_key);
+            }
+
+            llm_builder.build().expect("Failed to build LLM (Ollama)")
+        };
 
         // Assemble the Ollama request.
         let mut request = vec!["Please translate the following C project into a Rust project including Cargo manifest:".into()];
-        for (path, contents) in in_dir.files_recursive() {
-            request.push(format!(
-                "{} contains:\n{}",
-                path.to_string_lossy(),
-                String::from_utf8_lossy(contents)
-            ));
-        }
+        request.push(
+            serde_json::json!({"files": (&in_dir.files_recursive().iter().map(|(path, contents)| {
+                OutputFile {
+                    path: path.clone(),
+                    contents: String::from_utf8_lossy(contents).into(),
+                }
+        }).collect::<Vec<OutputFile>>())})
+            .to_string(),
+        );
         // "return as JSON" is suggested by https://ollama.com/blog/structured-outputs
         request.push("return as JSON".into());
         let request: Vec<_> = request
@@ -64,9 +84,13 @@ impl Tool for RawSourceToCargoLlm {
             .expect("no response text");
 
         // Parse the response, convert it into a CargoPackage representation.
-        let files: Vec<OutputFile> = serde_json::from_str(&response)?;
+        #[derive(Deserialize)]
+        struct OutputFiles {
+            files: Vec<OutputFile>,
+        }
+        let files: OutputFiles = serde_json::from_str(&response)?;
         let mut out_dir = RawDir::default();
-        for file in files {
+        for file in files.files {
             out_dir.set_file(&file.path, file.contents.into())?;
         }
         context
@@ -78,14 +102,20 @@ impl Tool for RawSourceToCargoLlm {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    /// Hostname and port at which to find the LLM serve. Example: [::1]:11434
-    address: String,
+    /// Hostname and port at which to find the LLM serve. Example: "http://[::1]:11434"
+    address: Option<String>,
+
+    /// API Key for the LLM service.
+    api_key: Option<String>,
 
     /// Which backend to use, e.g. "ollama".
     backend: String,
 
     /// Name of the model to invoke.
     model: String,
+
+    /// Maximum output tokens.
+    max_tokens: u32,
 
     #[serde(flatten)]
     unknown: HashMap<String, Value>,
@@ -107,24 +137,8 @@ fn raw_source(ir: &HarvestIR) -> Option<&RawDir> {
 }
 
 /// Structure representing a file created by the LLM.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct OutputFile {
     contents: String,
     path: PathBuf,
 }
-
-/// Structured output JSON schema for Ollama.
-const STRUCTURED_OUTPUT_SCHEMA: &str = r#"{
-    "name": "file",
-    "schema": {
-        "type": "array",
-        "items": {
-            "type": "object",
-            "properties": {
-                "path": { "type": "string" },
-                "contents": { "type": "string"}
-            },
-            "required": ["path", "contents"]
-        }
-    }
-}"#;
