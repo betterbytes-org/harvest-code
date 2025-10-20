@@ -41,6 +41,10 @@ impl HarvestIR {
         }
     }
 
+    pub fn get(&self, id: Id) -> Option<Arc<Representation>> {
+        self.representations.get(&id).cloned()
+    }
+
     /// Returns an iterator over the IDs and representations in this IR.
     pub fn iter(&self) -> impl Iterator<Item = (Id, &Representation)> {
         self.representations.iter().map(|(&id, repr)| (id, &**repr))
