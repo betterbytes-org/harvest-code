@@ -187,6 +187,24 @@ impl RawDir {
         };
         Ok(out)
     }
+
+    /// Materializes the [RawDir] to the file system.
+    ///
+    /// `path` is a path to an empty or non-existent directory noting
+    /// where the file system should be materialized to.
+    pub fn materialize<P: AsRef<Path>>(&self, base_path: P) -> std::io::Result<()> {
+        let base_path = base_path.as_ref();
+        for (file_path, contents) in self.files_recursive().iter() {
+            let dir_path = if let Some(parent) = file_path.parent() {
+                base_path.join(parent)
+            } else {
+                base_path.into()
+            };
+            std::fs::create_dir(dir_path)?;
+            std::fs::write(base_path.join(file_path), contents)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, thiserror::Error)]

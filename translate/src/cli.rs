@@ -22,6 +22,9 @@ pub struct Args {
     /// Prints out the location of the config file.
     #[arg(long)]
     pub print_config_path: bool,
+
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
 }
 
 /// Configuration for this harvest-translate run. The sources of these configuration values (from
@@ -40,6 +43,9 @@ pub struct Config {
     /// Path to the C code to translate. This path should be a directory in the
     /// project structure defined by the TRACTOR_Performers library.
     pub in_performer: PathBuf,
+
+    /// Path to output directory.
+    pub output: PathBuf,
 
     /// Sub-configuration for each tool.
     pub tools: tools::Config,
@@ -120,6 +126,13 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
             .set_override("in_performer", " ")
             .expect("settings override failed");
     }
+
+    if args.output.is_some() {
+        settings = settings
+            .set_override("output", " ")
+            .expect("settings override failed");
+    }
+
     let mut config: Config = settings
         .build()
         .expect("failed to build settings")
@@ -127,6 +140,9 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
         .expect("config deserialization failed");
     if let Some(ref performer) = args.in_performer {
         config.in_performer = performer.clone();
+    }
+    if let Some(ref output) = args.output {
+        config.output = output.clone();
     }
     config
 }
@@ -148,7 +164,7 @@ mod tests {
 
         assert_eq!(
             load_config(
-                &Args::parse_from(["", "--in-performer=a"]),
+                &Args::parse_from(["", "--in-performer=a", "--output=/tmp/out"]),
                 config_dir.path(),
             )
             .in_performer,
@@ -167,13 +183,17 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            load_config(&Args::parse_from([""]), config_dir.path()).in_performer,
+            load_config(
+                &Args::parse_from(["", "--output=/tmp/out"]),
+                config_dir.path()
+            )
+            .in_performer,
             AsRef::<Path>::as_ref("b")
         );
         // Verify the --config flag overrides the user's config file.
         assert_eq!(
             load_config(
-                &Args::parse_from(["", "--config", "in_performer=c"]),
+                &Args::parse_from(["", "--config", "in_performer=c", "--output=/tmp/out"]),
                 config_dir.path()
             )
             .in_performer,
@@ -182,7 +202,13 @@ mod tests {
         // Verify --in-performer overrides all the configuration options.
         assert_eq!(
             load_config(
-                &Args::parse_from(["", "--config", "in_performer=d", "--in-performer=d"]),
+                &Args::parse_from([
+                    "",
+                    "--config",
+                    "in_performer=d",
+                    "--in-performer=d",
+                    "--output=/tmp/out"
+                ]),
                 config_dir.path()
             )
             .in_performer,

@@ -19,6 +19,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }));
     scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
     scheduler.main_loop();
-    println!("{}", scheduler.ir_snapshot());
+    let ir = scheduler.ir_snapshot();
+    println!("{}", ir);
+
+    for (_, representation) in ir.iter() {
+        if let repr @ harvest_ir::Representation::CargoPackage(_) = representation {
+            repr.materialize(get_config().output.clone())?;
+            break;
+        }
+    }
     Ok(())
 }
