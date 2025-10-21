@@ -1,6 +1,5 @@
 use crate::{Id, Representation};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 /// A tool for making changes to (a subset of) the IR. When an `Edit` is
 /// created, it is given a limited set of representations which it can modify
@@ -14,27 +13,26 @@ use std::sync::Arc;
 /// 3. Edit the copied Representation.
 /// 4. Store the edited Representation into `context.ir_edit` using `write_id`.
 pub struct Edit {
-    // Contains every ID this tool can write. IDs that contain Some() will be
-    // written, and IDs that contain None will not be touched.
-    //
-    // Arc<> is used to avoid needing to copy the Representation into HarvestIR
-    // when this edit is merged into the main IR; it is not expected for there
-    // to be other references to these representations.
-    pub(crate) writable: HashMap<Id, Option<Arc<Representation>>>,
+    // Contains an entry for every ID this tool can write.
+    pub(crate) writable: HashMap<Id, IdState>,
 }
 
 impl Edit {
     /// Creates a new Edit, limited to changing the given set of IDs.
     pub fn new(might_change: &HashSet<Id>) -> Edit {
         Edit {
-            writable: might_change.iter().map(|&id| (id, None)).collect(),
+            writable: might_change
+                .iter()
+                .map(|&id| (id, IdState::new(false, None)))
+                .collect(),
         }
     }
 
     /// Adds a representation with a new ID and returns the new ID.
     pub fn add_representation(&mut self, representation: Representation) -> Id {
         let id = Id::new();
-        self.writable.insert(id, Some(representation.into()));
+        self.writable
+            .insert(id, IdState::new(true, Some(representation.into())));
         id
     }
 
@@ -42,7 +40,16 @@ impl Edit {
     pub fn changed_ids(&self) -> Vec<Id> {
         self.writable
             .iter()
-            .filter(|(_, r)| r.is_some())
+            .filter(|(_, state)| state.value.is_some())
+            .map(|(&id, _)| id)
+            .collect()
+    }
+
+    /// Returns the set of IDs passed to new() (not including IDs created by this Edit).
+    pub fn might_change(&self) -> HashSet<Id> {
+        self.writable
+            .iter()
+            .filter(|(_, s)| !s.new)
             .map(|(&id, _)| id)
             .collect()
     }
@@ -50,7 +57,7 @@ impl Edit {
     /// Creates a new ID and gives this tool write access to it.
     pub fn new_id(&mut self) -> Id {
         let id = Id::new();
-        self.writable.insert(id, None);
+        self.writable.insert(id, IdState::new(true, None));
         id
     }
 
@@ -63,7 +70,7 @@ impl Edit {
     ) -> Result<(), NotWritable> {
         self.writable
             .get_mut(&id)
-            .map(|v| *v = Some(representation.into()))
+            .map(|v| v.value = Some(representation.into()))
             .ok_or(NotWritable)
     }
 
@@ -80,6 +87,20 @@ impl Edit {
 #[derive(Debug, Eq, PartialEq, thiserror::Error)]
 #[error("cannot write this id")]
 pub struct NotWritable;
+
+pub(crate) struct IdState {
+    /// `true` if this ID was created by the Edit, `false` if this ID was passed into `new()`.
+    pub(crate) new: bool,
+
+    /// `None` if this `Edit` does not change this ID, `Some` if it does change this ID.
+    pub(crate) value: Option<Box<Representation>>,
+}
+
+impl IdState {
+    pub fn new(new: bool, value: Option<Box<Representation>>) -> IdState {
+        IdState { new, value }
+    }
+}
 
 #[cfg(test)]
 mod tests {

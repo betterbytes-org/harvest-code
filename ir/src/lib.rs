@@ -50,10 +50,16 @@ impl Representation {
 impl HarvestIR {
     pub fn apply_edit(&mut self, edit: Edit) {
         for (id, representation) in edit.writable {
-            if let Some(representation) = representation {
-                self.representations.insert(id, representation);
+            if let Some(representation) = representation.value {
+                self.representations.insert(id, representation.into());
             }
         }
+    }
+
+    /// Returns `true` if this `HarvestIR` contains a representation under the ID `id`, `false`
+    /// otherwise.
+    pub fn contains_id(&self, id: Id) -> bool {
+        self.representations.contains_key(&id)
     }
 
     /// Returns an iterator over the IDs and representations in this IR.
@@ -100,15 +106,13 @@ mod tests {
         let [(a, a_repr), (b, b_repr), (c, _)] = initial_ir;
         let mut edit = Edit::new(&[b, c].into());
         edit.write_id(c, new_representation());
-        let c_repr = edit.writable[&c].clone().unwrap();
         let d = edit.add_representation(new_representation());
-        let d_repr = edit.writable[&d].clone().unwrap();
         edit.new_id();
         ir.apply_edit(edit);
         assert_eq!(ir.representations.len(), 4);
         assert!(Arc::ptr_eq(&a_repr, &ir.representations[&a]));
         assert!(Arc::ptr_eq(&b_repr, &ir.representations[&b]));
-        assert!(Arc::ptr_eq(&c_repr, &ir.representations[&c]));
-        assert!(Arc::ptr_eq(&d_repr, &ir.representations[&d]));
+        assert!(ir.representations.get(&c).is_some());
+        assert!(ir.representations.get(&d).is_some());
     }
 }
