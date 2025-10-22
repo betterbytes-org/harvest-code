@@ -4,9 +4,22 @@ use crate::tools::{Context, Tool};
 use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
 use std::{collections::HashSet, fs::read_dir, path::PathBuf};
 
-pub struct Args {
-    /// The path to the source code project's root directory.
+use super::ToolInvocation;
+
+pub struct Invocation {
     pub directory: PathBuf,
+}
+
+impl ToolInvocation for Invocation {
+    fn create_tool(&self) -> Box<dyn Tool> {
+        Box::new(LoadRawSource::new(self.directory.clone()))
+    }
+}
+
+impl std::fmt::Display for Invocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "LoadRawSource({})", self.directory.display())
+    }
 }
 
 pub struct LoadRawSource {
@@ -14,9 +27,9 @@ pub struct LoadRawSource {
 }
 
 impl LoadRawSource {
-    pub fn new(args: &Args) -> LoadRawSource {
+    pub fn new(directory: PathBuf) -> LoadRawSource {
         LoadRawSource {
-            directory: Some(args.directory.clone()),
+            directory: Some(directory),
         }
     }
 }

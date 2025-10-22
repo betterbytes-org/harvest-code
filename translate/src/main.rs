@@ -7,7 +7,7 @@ mod test_util;
 
 use cli::get_config;
 use scheduler::Scheduler;
-use tools::{ToolInvocation, load_raw_source};
+use tools::{load_raw_source, raw_source_to_cargo_llm};
 
 fn main() {
     if let Err(e) = run() {
@@ -22,10 +22,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(()); // An early-exit argument was passed.
     }
     let mut scheduler = Scheduler::default();
-    scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
+    scheduler.queue_invocation(load_raw_source::Invocation {
         directory: get_config().in_performer.clone(),
-    }));
-    scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
+    });
+    scheduler.queue_invocation(raw_source_to_cargo_llm::Invocation);
     scheduler.main_loop()?;
     let ir = scheduler.ir_snapshot();
     log::info!("{}", ir);

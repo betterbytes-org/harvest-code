@@ -27,27 +27,8 @@ impl Config {
 }
 
 /// A tool invocation that the scheduler could choose to perform.
-pub enum ToolInvocation {
-    LoadRawSource(load_raw_source::Args),
-    RawSourceToCargoLlm,
-}
-
-impl ToolInvocation {
-    pub fn create_tool(&self) -> Box<dyn Tool> {
-        match self {
-            Self::LoadRawSource(args) => Box::new(load_raw_source::LoadRawSource::new(args)),
-            Self::RawSourceToCargoLlm => Box::new(raw_source_to_cargo_llm::RawSourceToCargoLlm),
-        }
-    }
-}
-
-impl Display for ToolInvocation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Self::RawSourceToCargoLlm => f.write_str("RawSourceToCargoLlm"),
-            Self::LoadRawSource(args) => write!(f, "LoadRawSource({})", args.directory.display()),
-        }
-    }
+pub trait ToolInvocation: Display {
+    fn create_tool(&self) -> Box<dyn Tool>;
 }
 
 /// Trait implemented by each tool. Used by the scheduler to decide what tools
