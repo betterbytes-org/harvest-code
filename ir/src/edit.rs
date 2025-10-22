@@ -1,5 +1,6 @@
 use crate::{Id, Representation};
-use std::{collections::HashMap, sync::Arc};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 /// A tool for making changes to (a subset of) the IR. When an `Edit` is
 /// created, it is given a limited set of representations which it can modify
@@ -24,7 +25,7 @@ pub struct Edit {
 
 impl Edit {
     /// Creates a new Edit, limited to changing the given set of IDs.
-    pub fn new(might_change: &[Id]) -> Edit {
+    pub fn new(might_change: &HashSet<Id>) -> Edit {
         Edit {
             writable: might_change.iter().map(|&id| (id, None)).collect(),
         }
@@ -98,7 +99,7 @@ mod tests {
         }
 
         let [a, b, c] = Id::new_array();
-        let mut edit = Edit::new(&[a, b]);
+        let mut edit = Edit::new(&[a, b].into());
         let d = edit.add_representation(new_representation());
         let e = edit.new_id();
         assert_eq!(
