@@ -9,7 +9,15 @@ use cli::get_config;
 use scheduler::Scheduler;
 use tools::{ToolInvocation, load_raw_source};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
+    if let Err(e) = run() {
+        log::error!("{}", e);
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
     if cli::initialize() {
         return Ok(()); // An early-exit argument was passed.
     }
@@ -18,9 +26,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         directory: get_config().in_performer.clone(),
     }));
     scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
-    scheduler.main_loop();
+    scheduler.main_loop()?;
     let ir = scheduler.ir_snapshot();
-    println!("{}", ir);
+    log::info!("{}", ir);
 
     for (_, representation) in ir.iter() {
         if let repr @ harvest_ir::Representation::CargoPackage(_) = representation {

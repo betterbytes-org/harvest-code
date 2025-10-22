@@ -25,8 +25,8 @@ impl Tool for RawSourceToCargoLlm {
     }
 
     fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>> {
-        let config = get_config();
-        let config = &config.tools.raw_source_to_cargo_llm;
+        let config = &get_config().tools.raw_source_to_cargo_llm;
+        log::debug!("LLM Configuration {config:?}");
         let in_dir = raw_source(&context.ir_snapshot).unwrap();
 
         // Use the llm crate to connect to Ollama.
@@ -47,9 +47,9 @@ impl Tool for RawSourceToCargoLlm {
                 llm_builder = llm_builder.base_url(address);
             }
             if let Some(ref api_key) = config.api_key
-                && !api_key.is_empty()
+                && !api_key.0.is_empty()
             {
-                llm_builder = llm_builder.api_key(api_key);
+                llm_builder = llm_builder.api_key(&api_key.0);
             }
 
             llm_builder.build().expect("Failed to build LLM (Ollama)")
@@ -73,7 +73,8 @@ impl Tool for RawSourceToCargoLlm {
             .map(|contents| ChatMessage::user().content(contents).build())
             .collect();
 
-        // Make the Ollama call.
+        // Make the LLM call.
+        log::trace!("Making LLM call with {:?}", request);
         let response = tokio::runtime::Builder::new_current_thread()
             .enable_io()
             .enable_time()
@@ -88,7 +89,9 @@ impl Tool for RawSourceToCargoLlm {
         struct OutputFiles {
             files: Vec<OutputFile>,
         }
+        log::trace!("LLM responded: {:?}", &response);
         let files: OutputFiles = serde_json::from_str(&response)?;
+        log::info!("LLM response contains {} files.", files.files.len());
         let mut out_dir = RawDir::default();
         for file in files.files {
             out_dir.set_file(&file.path, file.contents.into())?;
@@ -100,13 +103,22 @@ impl Tool for RawSourceToCargoLlm {
     }
 }
 
+#[derive(Deserialize)]
+pub struct ApiKey(String);
+
+impl std::fmt::Debug for ApiKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("********")
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     /// Hostname and port at which to find the LLM serve. Example: "http://[::1]:11434"
     address: Option<String>,
 
     /// API Key for the LLM service.
-    api_key: Option<String>,
+    api_key: Option<ApiKey>,
 
     /// Which backend to use, e.g. "ollama".
     backend: String,

@@ -20,11 +20,12 @@ impl Scheduler {
     }
 
     /// The scheduler main loop -- invokes tools until done.
-    pub fn main_loop(&mut self) {
+    pub fn main_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // TODO: This is just a temporary implementation to make the
         // LoadRawSource invocation run; this all needs to be restructured to
         // fit the design doc.
         for invocation in &self.queued_invocations {
+            log::debug!("Attempting to invoke {invocation}");
             let mut tool = invocation.create_tool();
             // TODO: Diagnostics for tools that are not runnable (which is not
             // necessarily an error).
@@ -43,12 +44,16 @@ impl Scheduler {
                 ir_edit: &mut ir_edit,
                 ir_snapshot: self.ir.clone(),
             })
-            .expect("tool invocation failed");
+            .map_err(|e| {
+                log::debug!("Invoking {invocation} failed: {e}");
+                e
+            })?;
             // TODO: Verify that ir_edit doesn't touch any IDs that might_write
             // did not return (it's theoretically possible -- though not
             // sensible -- for tools to replace ir_edit entirely).
             Arc::make_mut(&mut self.ir).apply_edit(ir_edit);
         }
+        Ok(())
     }
 
     /// Add a tool invocation to the scheduler's queue. Note that scheduling a

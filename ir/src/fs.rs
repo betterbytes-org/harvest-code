@@ -38,6 +38,9 @@ pub struct RawDir(BTreeMap<OsString, RawEntry>);
 impl RawDir {
     /// Create a [RawDir] from a local file system directory
     ///
+    /// Returns the [RawDir], number of directories and number of
+    /// files, as a tuple.
+    ///
     /// # Arguments
     ///
     /// * `read_dir` - a [ReadDir] iterator over a file-system
@@ -52,26 +55,31 @@ impl RawDir {
     /// # fn main() -> std::io::Result<()> {
     /// # let dir = tempfile::tempdir().unwrap();
     /// # let path = dir.path();
-    /// let raw_dir = RawDir::populate_from(std::fs::read_dir(path)?)?;
+    /// let (raw_dir, num_dirs, num_files) = RawDir::populate_from(std::fs::read_dir(path)?)?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn populate_from(read_dir: ReadDir) -> std::io::Result<Self> {
+    pub fn populate_from(read_dir: ReadDir) -> std::io::Result<(Self, usize, usize)> {
+        let mut directories = 0;
+        let mut files = 0;
         let mut result = BTreeMap::default();
         for entry in read_dir {
             let entry = entry?;
             let metadata = entry.metadata()?;
             if metadata.is_dir() {
-                let subdir = RawDir::populate_from(std::fs::read_dir(entry.path())?)?;
+                let (subdir, dirs, fs) = RawDir::populate_from(std::fs::read_dir(entry.path())?)?;
+                directories += dirs + 1;
+                files += fs;
                 result.insert(entry.file_name(), RawEntry::Dir(subdir));
             } else if metadata.is_file() {
                 let contents = std::fs::read(entry.path())?;
                 result.insert(entry.file_name(), RawEntry::File(contents));
+                files += 1;
             } else {
                 unimplemented!("No support yet for symlinks in source project.");
             }
         }
-        Ok(RawDir(result))
+        Ok((RawDir(result), directories, files))
     }
 
     /// Print a representation of the directory to standard out.
