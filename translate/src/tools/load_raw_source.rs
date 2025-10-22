@@ -2,7 +2,7 @@
 
 use crate::tools::{Context, Tool};
 use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
-use std::{fs::read_dir, path::PathBuf};
+use std::{collections::HashSet, fs::read_dir, path::PathBuf};
 
 pub struct Args {
     /// The path to the source code project's root directory.
@@ -24,8 +24,8 @@ impl LoadRawSource {
 impl Tool for LoadRawSource {
     // LoadRawSource will create a new representation, not modify an existing
     // one.
-    fn might_write(&mut self, _ir: &HarvestIR) -> Option<Vec<Id>> {
-        Some(vec![])
+    fn might_write(&mut self, _ir: &HarvestIR) -> Option<HashSet<Id>> {
+        Some([].into())
     }
 
     fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>> {
