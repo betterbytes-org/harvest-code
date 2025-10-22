@@ -108,7 +108,8 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
             include_str!("../default_config.toml"),
             Toml,
         ))
-        .add_source(config::File::from(config_file(config_dir)).required(false));
+        .add_source(config::File::from(config_file(config_dir)).required(false))
+        .add_source(config::File::from(PathBuf::from("config.toml")).required(false));
     for config_arg in &args.config {
         let Some((name, value)) = config_arg.split_once('=') else {
             panic!("failed to parse config value {config_arg:?}; no '=' found");

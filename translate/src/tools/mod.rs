@@ -5,8 +5,11 @@ use crate::cli::unknown_field_warning;
 use harvest_ir::{Edit, HarvestIR, Id};
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+    sync::Arc,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -34,6 +37,15 @@ impl ToolInvocation {
         match self {
             Self::LoadRawSource(args) => Box::new(load_raw_source::LoadRawSource::new(args)),
             Self::RawSourceToCargoLlm => Box::new(raw_source_to_cargo_llm::RawSourceToCargoLlm),
+        }
+    }
+}
+
+impl Display for ToolInvocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            Self::RawSourceToCargoLlm => f.write_str("RawSourceToCargoLlm"),
+            Self::LoadRawSource(args) => write!(f, "LoadRawSource({})", args.directory.display()),
         }
     }
 }
