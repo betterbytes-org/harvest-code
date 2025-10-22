@@ -1,13 +1,13 @@
 # HARVEST-Translate design
 
-Status: Work-in-Progress \
-Author: Johnathan Van Why
-
 `harvest_translate` is HARVEST's C->Rust translation frontend. Given a C project
 as input, it oversees the parsing, analysis, lowering, and testing steps needed
 to translate the project into Rust. This document describes the high-level
 design of `harvest_translate`: its operating principles, and how it integrates
 with the rest of the HARVEST ecosystem.
+
+Note that `harvest_translate` is an active work-in-progress; this document
+describes the intended design, not the current state of its implementation.
 
 ## Components
 
