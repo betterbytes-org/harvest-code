@@ -12,11 +12,27 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use super::ToolInvocation;
+
 /// Structured output JSON schema for Ollama.
 const STRUCTURED_OUTPUT_SCHEMA: &str =
     include_str!("raw_source_to_cargo_llm/structured_schema.json");
 
 const SYSTEM_PROMPT: &str = include_str!("raw_source_to_cargo_llm/system_prompt.txt");
+
+pub struct Invocation;
+
+impl ToolInvocation for Invocation {
+    fn create_tool(&self) -> Box<dyn Tool> {
+        Box::new(RawSourceToCargoLlm)
+    }
+}
+
+impl std::fmt::Display for Invocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("RawSourceToCargoLlm")
+    }
+}
 
 pub struct RawSourceToCargoLlm;
 

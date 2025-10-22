@@ -10,7 +10,7 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct Scheduler {
     ir: Arc<HarvestIR>,
-    queued_invocations: Vec<ToolInvocation>,
+    queued_invocations: Vec<Box<dyn ToolInvocation>>,
 }
 
 impl Scheduler {
@@ -59,7 +59,7 @@ impl Scheduler {
     /// Add a tool invocation to the scheduler's queue. Note that scheduling a
     /// tool invocation does not guarantee the tool will run, as a tool may
     /// indicate that it is not runnable.
-    pub fn queue_invocation(&mut self, invocation: ToolInvocation) {
-        self.queued_invocations.push(invocation);
+    pub fn queue_invocation<T: ToolInvocation + 'static>(&mut self, invocation: T) {
+        self.queued_invocations.push(Box::new(invocation));
     }
 }
