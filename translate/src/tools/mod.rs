@@ -5,7 +5,8 @@ use crate::cli::unknown_field_warning;
 use harvest_ir::{Edit, HarvestIR, Id};
 use serde::Deserialize;
 use serde_json::Value;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -60,7 +61,7 @@ pub trait Tool: Send {
     /// 1. The tool requires input data that `ir` does not have.
     /// 2. The tool creates data that already exists in `ir` so there is nothing
     ///    to do.
-    fn might_write(&mut self, ir: &HarvestIR) -> Option<Vec<Id>>;
+    fn might_write(&mut self, ir: &HarvestIR) -> Option<HashSet<Id>>;
 
     /// Runs the tool logic. IR access and edits are made using `context`.
     ///

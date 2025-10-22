@@ -8,7 +8,9 @@ use llm::builder::{LLMBackend, LLMBuilder};
 use llm::chat::{ChatMessage, StructuredOutputFormat};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, path::PathBuf, str::FromStr};
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::str::FromStr;
 
 /// Structured output JSON schema for Ollama.
 const STRUCTURED_OUTPUT_SCHEMA: &str =
@@ -19,9 +21,9 @@ const SYSTEM_PROMPT: &str = include_str!("raw_source_to_cargo_llm/system_prompt.
 pub struct RawSourceToCargoLlm;
 
 impl Tool for RawSourceToCargoLlm {
-    fn might_write(&mut self, ir: &HarvestIR) -> Option<Vec<Id>> {
+    fn might_write(&mut self, ir: &HarvestIR) -> Option<HashSet<Id>> {
         // We need a raw_source to be available, but we won't write any existing IDs.
-        raw_source(ir).map(|_| vec![])
+        raw_source(ir).map(|_| [].into())
     }
 
     fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>> {

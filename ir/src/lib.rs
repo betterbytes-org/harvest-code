@@ -98,7 +98,7 @@ mod tests {
             representations: initial_ir.clone().into_iter().collect(),
         };
         let [(a, a_repr), (b, b_repr), (c, _)] = initial_ir;
-        let mut edit = Edit::new(&[b, c]);
+        let mut edit = Edit::new(&[b, c].into());
         edit.write_id(c, new_representation());
         let c_repr = edit.writable[&c].clone().unwrap();
         let d = edit.add_representation(new_representation());
