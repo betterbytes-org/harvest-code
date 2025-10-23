@@ -26,6 +26,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         directory: get_config().in_performer.clone(),
     }));
     scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
+    scheduler.queue_invocation(ToolInvocation::ValidateBuild);
     scheduler.main_loop()?;
     let ir = scheduler.ir_snapshot();
     log::info!("{}", ir);

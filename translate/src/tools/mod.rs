@@ -1,5 +1,6 @@
 pub mod load_raw_source;
 pub mod raw_source_to_cargo_llm;
+pub mod validate_build;
 
 use crate::cli::unknown_field_warning;
 use harvest_ir::{Edit, HarvestIR, Id};
@@ -30,6 +31,7 @@ impl Config {
 pub enum ToolInvocation {
     LoadRawSource(load_raw_source::Args),
     RawSourceToCargoLlm,
+    ValidateBuild,
 }
 
 impl ToolInvocation {
@@ -37,6 +39,7 @@ impl ToolInvocation {
         match self {
             Self::LoadRawSource(args) => Box::new(load_raw_source::LoadRawSource::new(args)),
             Self::RawSourceToCargoLlm => Box::new(raw_source_to_cargo_llm::RawSourceToCargoLlm),
+            Self::ValidateBuild => Box::new(crate::tools::validate_build::ValidateBuild),
         }
     }
 }
@@ -46,6 +49,7 @@ impl Display for ToolInvocation {
         match self {
             Self::RawSourceToCargoLlm => f.write_str("RawSourceToCargoLlm"),
             Self::LoadRawSource(args) => write!(f, "LoadRawSource({})", args.directory.display()),
+            Self::ValidateBuild => f.write_str("ValidateBuild"),
         }
     }
 }
