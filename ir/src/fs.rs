@@ -208,7 +208,9 @@ impl RawDir {
             } else {
                 base_path.into()
             };
-            std::fs::create_dir(dir_path)?;
+            if !dir_path.exists() {
+                std::fs::create_dir(dir_path)?;
+            }
             std::fs::write(base_path.join(file_path), contents)?;
         }
         Ok(())
