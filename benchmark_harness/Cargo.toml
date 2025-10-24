@@ -1,12 +1,12 @@
 [package]
-name = "benchmark_harness"
+name = "harvest-benchmark"
 version = "0.1.0"
 edition = "2021"
 description = "Runs a set of benchmarks and provides useful output"
 license = "MIT OR Apache-2.0"
 
 [[bin]]
-name = "benchmark_harness"
+name = "benchmark"
 path = "src/main.rs"
 
 
