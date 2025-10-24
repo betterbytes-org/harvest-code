@@ -6,6 +6,7 @@ mod tools;
 mod test_util;
 
 use cli::get_config;
+use harvest_ir::edit;
 use scheduler::Scheduler;
 use tools::{ToolInvocation, load_raw_source};
 
@@ -21,14 +22,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if cli::initialize() {
         return Ok(()); // An early-exit argument was passed.
     }
+    let mut ir_organizer = edit::Organizer::default();
     let mut scheduler = Scheduler::default();
     scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
         directory: get_config().in_performer.clone(),
     }));
     scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
     scheduler.queue_invocation(ToolInvocation::TryCargoBuild);
-    scheduler.main_loop()?;
-    let ir = scheduler.ir_snapshot();
+    scheduler.main_loop(&mut ir_organizer)?;
+    let ir = ir_organizer.snapshot();
     log::info!("{}", ir);
     Ok(())
 }

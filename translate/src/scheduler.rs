@@ -4,54 +4,50 @@
 //! for invoking them. It is effectively the main loop of harvest_translate.
 
 use crate::tools::{Context, ToolInvocation};
-use harvest_ir::HarvestIR;
-use std::sync::Arc;
+use harvest_ir::edit;
 
 #[derive(Default)]
 pub struct Scheduler {
-    ir: Arc<HarvestIR>,
     queued_invocations: Vec<ToolInvocation>,
 }
 
 impl Scheduler {
-    /// Returns the current IR snapshot.
-    pub fn ir_snapshot(&self) -> Arc<HarvestIR> {
-        self.ir.clone()
-    }
-
     /// The scheduler main loop -- invokes tools until done.
-    pub fn main_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn main_loop(
+        &mut self,
+        ir: &mut edit::Organizer,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // TODO: This is just a temporary implementation to make the
         // LoadRawSource invocation run; this all needs to be restructured to
         // fit the design doc.
         for invocation in &self.queued_invocations {
             log::debug!("Attempting to invoke {invocation}");
             let mut tool = invocation.create_tool();
+            let snapshot = ir.snapshot();
             // TODO: Diagnostics for tools that are not runnable (which is not
             // necessarily an error).
-            let Some(ids) = tool.might_write(&self.ir) else {
-                continue;
-            };
-            // TODO: Track which IDs are in use and allow tools to write IDs.
-            // This implementation is conservative which is correct but too
-            // limited (tools can only add new IDs).
-            if !ids.is_empty() {
+            let Some(ids) = tool.might_write(&snapshot) else {
                 continue;
             };
             // TODO: Catch panics and handle errors appropriately.
-            let mut ir_edit = harvest_ir::Edit::new(&ids);
+            let mut ir_edit = match ir.new_edit(&ids) {
+                Ok(edit) => edit,
+                Err(error) => {
+                    log::error!("Tool::might_write ID error: {error}");
+                    continue;
+                }
+            };
             tool.run(Context {
                 ir_edit: &mut ir_edit,
-                ir_snapshot: self.ir.clone(),
+                ir_snapshot: snapshot,
             })
             .map_err(|e| {
                 log::debug!("Invoking {invocation} failed: {e}");
                 e
             })?;
-            // TODO: Verify that ir_edit doesn't touch any IDs that might_write
-            // did not return (it's theoretically possible -- though not
-            // sensible -- for tools to replace ir_edit entirely).
-            Arc::make_mut(&mut self.ir).apply_edit(ir_edit);
+            if let Err(error) = ir.apply_edit(ir_edit) {
+                log::error!("Failed to apply edit: {error}");
+            }
         }
         Ok(())
     }
