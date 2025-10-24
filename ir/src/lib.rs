@@ -4,6 +4,7 @@ mod id;
 
 pub use edit::Edit;
 pub use id::Id;
+use std::path::PathBuf;
 use std::{collections::BTreeMap, fmt::Display, ops::Deref, path::Path, sync::Arc};
 
 /// Harvest Intermediate Representation
@@ -24,6 +25,9 @@ pub struct HarvestIR {
 
 /// An abstract representation of a program
 pub enum Representation {
+    /// A Rust artifact that has been built with `cargo build`.
+    CargoBuildResult(Result<Vec<PathBuf>, String>),
+
     /// A cargo package, ready to be built with `cargo build`.
     CargoPackage(fs::RawDir),
 
@@ -43,6 +47,7 @@ impl Representation {
         match self {
             Representation::CargoPackage(raw_dir) => raw_dir.materialize(path),
             Representation::RawSource(raw_dir) => raw_dir.materialize(path),
+            Representation::CargoBuildResult(_) => Ok(()), // Building the artifact is the materialization
         }
     }
 }
@@ -66,6 +71,19 @@ impl Display for HarvestIR {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for r in self.representations.values() {
             match r.deref() {
+                Representation::CargoBuildResult(r) => {
+                    writeln!(f, "Built Rust artifact:")?;
+                    match r {
+                        Ok(artifact_filenames) => {
+                            writeln!(f, "  Build succeeded. Artifacts:")?;
+                            for filename in artifact_filenames {
+                                writeln!(f, "    {}", filename.display())?;
+                            }
+                        }
+                        Err(err) => writeln!(f, "  Build failed: {}", err)?,
+                    }
+                }
+
                 Representation::CargoPackage(r) => {
                     writeln!(f, "Cargo package:")?;
                     r.display(0, f)?
