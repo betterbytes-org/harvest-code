@@ -14,7 +14,7 @@ pub struct TryCargoBuild;
 /// - If the project builds successfully, it returns Ok(None).
 /// - If the project fails to build, it returns Ok(Some(error_message)).
 /// - If there is an error running cargo, it returns Err.
-pub fn try_cargo_build(
+fn try_cargo_build(
     project_path: &PathBuf,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
     log::info!("Validating that the generated Rust project builds...");
