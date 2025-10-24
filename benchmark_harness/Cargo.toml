@@ -1,0 +1,19 @@
+[package]
+name = "benchmark_harness"
+version = "0.1.0"
+edition = "2021"
+description = "Runs a set of benchmarks and provides useful output"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "benchmark_harness"
+path = "src/main.rs"
+
+
+[dependencies]
+clap = { version = "4.4", features = ["derive"] }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+walkdir = "2.0"
+csv = "1.3"
