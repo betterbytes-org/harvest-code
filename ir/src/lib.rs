@@ -53,12 +53,10 @@ impl Representation {
 }
 
 impl HarvestIR {
-    pub fn apply_edit(&mut self, edit: Edit) {
-        for (id, representation) in edit.writable {
-            if let Some(representation) = representation {
-                self.representations.insert(id, representation);
-            }
-        }
+    /// Returns `true` if this `HarvestIR` contains a representation under ID `id`, `false`
+    /// otherwise.
+    pub fn contains_id(&self, id: Id) -> bool {
+        self.representations.contains_key(&id)
     }
 
     /// Returns an iterator over the IDs and representations in this IR.
@@ -107,26 +105,5 @@ mod tests {
     /// doesn't care what it is).
     pub(crate) fn new_representation() -> Representation {
         Representation::RawSource(RawDir::default())
-    }
-
-    #[test]
-    fn apply_edit() {
-        let initial_ir = Id::new_array::<3>().map(|i| (i, new_representation().into()));
-        let mut ir = HarvestIR {
-            representations: initial_ir.clone().into_iter().collect(),
-        };
-        let [(a, a_repr), (b, b_repr), (c, _)] = initial_ir;
-        let mut edit = Edit::new(&[b, c].into());
-        edit.write_id(c, new_representation());
-        let c_repr = edit.writable[&c].clone().unwrap();
-        let d = edit.add_representation(new_representation());
-        let d_repr = edit.writable[&d].clone().unwrap();
-        edit.new_id();
-        ir.apply_edit(edit);
-        assert_eq!(ir.representations.len(), 4);
-        assert!(Arc::ptr_eq(&a_repr, &ir.representations[&a]));
-        assert!(Arc::ptr_eq(&b_repr, &ir.representations[&b]));
-        assert!(Arc::ptr_eq(&c_repr, &ir.representations[&c]));
-        assert!(Arc::ptr_eq(&d_repr, &ir.representations[&d]));
     }
 }
