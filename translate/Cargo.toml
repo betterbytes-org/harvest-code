@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+cargo_metadata = "0.23.0"
 clap = { features = ["derive"], version = "4.5.45" }
 config = { default-features = false, features = ["toml"], version = "0.15.18" }
 directories = "6.0.0"
