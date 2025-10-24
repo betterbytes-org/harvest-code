@@ -67,8 +67,6 @@ fn try_cargo_build(project_path: &PathBuf) -> Result<BuildResult, Box<dyn std::e
             )
         })?;
 
-    // let stdout = String::from_utf8_lossy(&output.stdout);
-
     if output.status.success() {
         log::info!("Project builds successfully!");
         let artifact_filenames = parse_compiled_artifacts(&output.stdout)?;

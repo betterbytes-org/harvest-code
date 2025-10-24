@@ -82,7 +82,6 @@ impl Display for HarvestIR {
                         }
                         Err(err) => writeln!(f, "  Build failed: {}", err)?,
                     }
-                    // r.display(0, f)?
                 }
 
                 Representation::CargoPackage(r) => {
