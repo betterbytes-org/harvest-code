@@ -51,4 +51,20 @@ impl SummaryStats {
             (self.total_passed_tests as f64 / self.total_tests as f64) * 100.0
         }
     }
+
+    pub fn translation_success_rate(&self) -> f64 {
+        if self.num_programs == 0 {
+            0.0
+        } else {
+            (self.successful_translations as f64 / self.num_programs as f64) * 100.0
+        }
+    }
+
+    pub fn rust_build_success_rate(&self) -> f64 {
+        if self.num_programs == 0 {
+            0.0
+        } else {
+            (self.successful_rust_builds as f64 / self.num_programs as f64) * 100.0
+        }
+    }
 }
