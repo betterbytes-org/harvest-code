@@ -30,12 +30,5 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     scheduler.main_loop()?;
     let ir = scheduler.ir_snapshot();
     log::info!("{}", ir);
-
-    for (_, representation) in ir.iter() {
-        if let repr @ harvest_ir::Representation::CargoPackage(_) = representation {
-            repr.materialize(get_config().output.clone())?;
-            break;
-        }
-    }
     Ok(())
 }

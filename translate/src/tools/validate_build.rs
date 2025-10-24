@@ -1,5 +1,6 @@
 //! Checks if a generated Rust project builds by materializing
-//! it to a tempdir and running `cargo build`.
+//! it to a tempdir and running `cargo build --release`.
+use crate::cli::get_config;
 use crate::tools::{Context, Tool};
 use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
 use std::collections::HashSet;
@@ -8,16 +9,20 @@ use std::process::Command;
 
 pub struct ValidateBuild;
 
-/// Validates that the generated Rust project builds by running `cargo build`.
-/// Returns Ok(()) if the project builds successfully, or an error with the cargo output.
+/// Validates that the generated Rust project builds by running `cargo build --release`.
+/// Note: It has a bit of a confusing return type:
+/// - If the project builds successfully, it returns Ok(None).
+/// - If the project fails to build, it returns Ok(Some(error_message)).
+/// - If there is an error running cargo, it returns Err.
 pub fn validate_rust_project_builds(
     project_path: &PathBuf,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<Option<String>, Box<dyn std::error::Error>> {
     log::info!("Validating that the generated Rust project builds...");
 
     // Run cargo build in the project directory
     let output = Command::new("cargo")
         .arg("build")
+        .arg("--release")
         .current_dir(project_path)
         .output()
         .map_err(|e| {
@@ -30,24 +35,24 @@ pub fn validate_rust_project_builds(
 
     if output.status.success() {
         log::info!("Project builds successfully!");
-        Ok(())
+        Ok(None)
     } else {
         // Combine stderr and stdout for a complete error message
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
         let error_message = format!("STDOUT:\n{}\n\nSTDERR:\n{}", stdout, stderr);
-        Err(error_message.into())
+        Ok(Some(error_message.into()))
     }
 }
 
 /// Returns the CargoPackage representation in IR.
 /// If there is not exactly 1 CargoPackage representation,
 /// return an error.
-fn raw_cargo_package(ir: &HarvestIR) -> Result<(Id, &RawDir), Box<dyn std::error::Error>> {
-    let cargo_packages: Vec<(Id, &RawDir)> = ir
+fn raw_cargo_package(ir: &HarvestIR) -> Result<&RawDir, Box<dyn std::error::Error>> {
+    let cargo_packages: Vec<&RawDir> = ir
         .iter()
-        .filter_map(|(id, repr)| match repr {
-            Representation::CargoPackage(r) => Some((id, r)),
+        .filter_map(|(_, repr)| match repr {
+            Representation::CargoPackage(r) => Some(r),
             _ => None,
         })
         .collect();
@@ -71,17 +76,21 @@ impl Tool for ValidateBuild {
 
     fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>> {
         // get cargo package representation
-        let (_, cargo_package) = raw_cargo_package(&context.ir_snapshot)?;
-
-        // Create a temp directory, should get dropped after it goes out of scope
-        let temp_dir = tempfile::tempdir()?;
-        let temp_path = temp_dir.path().to_path_buf();
-
-        cargo_package.materialize(temp_path.clone())?;
+        let cargo_package = raw_cargo_package(&context.ir_snapshot)?;
+        let output_path = get_config().output.clone();
+        cargo_package.materialize(&output_path)?;
 
         // Validate that the Rust project builds
-        validate_rust_project_builds(&temp_path)?;
-
+        let compilation_result = validate_rust_project_builds(&output_path)?;
+        // Write result to IR
+        match compilation_result {
+            None => context
+                .ir_edit
+                .add_representation(Representation::BuiltRustArtifact(Ok(()))),
+            Some(err) => context
+                .ir_edit
+                .add_representation(Representation::BuiltRustArtifact(Err(err))),
+        };
         Ok(())
     }
 }

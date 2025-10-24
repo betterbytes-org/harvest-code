@@ -24,6 +24,9 @@ pub struct HarvestIR {
 
 /// An abstract representation of a program
 pub enum Representation {
+    /// A Rust artifact that has been built with `cargo build`.
+    BuiltRustArtifact(Result<(), String>),
+
     /// A cargo package, ready to be built with `cargo build`.
     CargoPackage(fs::RawDir),
 
@@ -43,6 +46,7 @@ impl Representation {
         match self {
             Representation::CargoPackage(raw_dir) => raw_dir.materialize(path),
             Representation::RawSource(raw_dir) => raw_dir.materialize(path),
+            Representation::BuiltRustArtifact(_) => Ok(()), // Building the artifact is the materialization
         }
     }
 }
@@ -66,6 +70,15 @@ impl Display for HarvestIR {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for r in self.representations.values() {
             match r.deref() {
+                Representation::BuiltRustArtifact(r) => {
+                    writeln!(f, "Built Rust artifact:")?;
+                    match r {
+                        Ok(()) => writeln!(f, "  Build succeeded")?,
+                        Err(err) => writeln!(f, "  Build failed: {}", err)?,
+                    }
+                    // r.display(0, f)?
+                }
+
                 Representation::CargoPackage(r) => {
                     writeln!(f, "Cargo package:")?;
                     r.display(0, f)?
