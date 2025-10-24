@@ -23,7 +23,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     let mut scheduler = Scheduler::default();
     scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
-        directory: get_config().in_performer.clone(),
+        directory: get_config().inputdir.clone(),
     }));
     scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
     scheduler.main_loop()?;
