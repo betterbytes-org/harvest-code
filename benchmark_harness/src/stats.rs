@@ -2,7 +2,7 @@ use serde::Serialize;
 
 /// Statistics for a a single test on a program
 #[derive(Debug, Clone, Serialize)]
-struct IndividualTestResult {
+pub struct TestResult {
     // program_name: String,
     test_filename: String,
     passed: bool,
@@ -17,8 +17,8 @@ pub struct ProgramEvalStats {
     pub total_tests: usize,
     pub passed_tests: usize,
     pub error_message: Option<String>,
-    // Store individual test results with filenames for new CSV format
-    pub individual_test_results: Vec<IndividualTestResult>,
+    // Store individual test results with filenames and pass/fail status
+    pub test_results: Vec<TestResult>,
 }
 
 impl ProgramEvalStats {
@@ -65,6 +65,17 @@ impl SummaryStats {
             0.0
         } else {
             (self.successful_rust_builds as f64 / self.num_programs as f64) * 100.0
+        }
+    }
+
+    pub fn from_results(results: &[ProgramEvalStats]) -> Self {
+        // Calculate summary statistics
+        SummaryStats {
+            num_programs: results.len(),
+            successful_translations: results.iter().filter(|r| r.translation_success).count(),
+            successful_rust_builds: results.iter().filter(|r| r.rust_build_success).count(),
+            total_tests: results.iter().map(|r| r.total_tests).sum(),
+            total_passed_tests: results.iter().map(|r| r.passed_tests).sum(),
         }
     }
 }
