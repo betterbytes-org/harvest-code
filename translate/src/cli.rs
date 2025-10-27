@@ -35,11 +35,6 @@ pub struct Args {
 /// 3. Defaults specified in the code (using `#[serde(default)]`).
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    // Currently, this is the only input format supported, so input is required. However, in
-    // the future, we'll want to be able to take a different input format that conveys more
-    // information (such as the version control history, code review comments, etc). When that
-    // format has been defined, we'll add a separate config option to specify it, and change the
-    // requirement to "specify either input or the other input option".
     ///  Path to the directory containing the C code to translate.
     pub input: PathBuf,
 
