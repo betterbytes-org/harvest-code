@@ -7,7 +7,7 @@ repository.
 
 ### Translate C code to Rust
 ```bash
-cargo run --bin=harvest_translate -- -i /path/to/c/code -o /path/to/output
+cargo run --bin=harvest_translate -- /path/to/c/code -o /path/to/output
 ```
 
 ### Configuration
