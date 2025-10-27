@@ -7,13 +7,13 @@ repository.
 
 ### Translate C code to Rust
 ```bash
-cargo run --bin=harvest_translate -- /path/to/c/code -o /path/to/output
+cargo run -- /path/to/c/code -o /path/to/output
 ```
 
 ### Configuration
 Print config file location:
 ```bash
-cargo run --bin=harvest_translate -- --print-config-path
+cargo run -- --print-config-path
 ```
 
 
