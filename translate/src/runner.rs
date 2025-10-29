@@ -1,7 +1,8 @@
-use crate::tools::{Context, Tool};
+use crate::tools::{RunContext, Tool};
 use harvest_ir::edit::{self, NewEditError};
 use harvest_ir::{Edit, HarvestIR, Id};
 use std::collections::{HashMap, HashSet};
+use std::fmt::{self, Debug, Formatter};
 use std::iter::once;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
@@ -63,8 +64,11 @@ impl ToolRunner {
         tool: Box<dyn Tool>,
         ir_snapshot: Arc<HarvestIR>,
         might_write: HashSet<Id>,
-    ) -> Result<(), NewEditError> {
-        let mut edit = edit_organizer.new_edit(&might_write)?;
+    ) -> Result<(), SpawnToolError> {
+        let mut edit = match edit_organizer.new_edit(&might_write) {
+            Err(error) => return Err(SpawnToolError { cause: error, tool }),
+            Ok(edit) => edit,
+        };
         let sender = self.sender.clone();
         let join_handle = spawn(move || {
             // Tool::run is not necessarily unwind safe, which means that if it panics it might
@@ -74,14 +78,13 @@ impl ToolRunner {
             // to be unwind safe, so instead this function needs to make sure that values *in this
             // same thread* that `tool` might touch are appropriately dropped/forgotten if `run`
             // panics.
-            let mut tool = AssertUnwindSafe(tool);
-            let result = catch_unwind(move || {
-                tool.run(Context {
+            let result = catch_unwind(AssertUnwindSafe(|| {
+                tool.run(RunContext {
                     ir_edit: &mut edit,
                     ir_snapshot,
                 })
                 .map(|_| edit)
-            });
+            }));
             let _ = sender.send(thread::current().id());
             // TODO: Diagnostics module.
             match result {
@@ -102,6 +105,18 @@ impl ToolRunner {
     }
 }
 
+/// An error returned from spawn_tool.
+pub struct SpawnToolError {
+    pub cause: NewEditError,
+    pub tool: Box<dyn Tool>,
+}
+
+impl Debug for SpawnToolError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.cause)
+    }
+}
+
 /// Data the ToolRunner tracks for each currently-running thread. These are accessed from the main
 /// thread.
 struct RunningInvocation {
@@ -111,58 +126,10 @@ struct RunningInvocation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{MightWriteOutcome::Runnable, test_util::MockTool};
     use harvest_ir::Representation::RawSource;
     use harvest_ir::edit::{self, NewEditError};
     use harvest_ir::fs::RawDir;
-    use std::{error::Error, mem::take};
-
-    /// A tool that can have several different behaviors.
-    struct TestTool {
-        might_write: HashSet<Id>,
-        receiver: Receiver<Behavior>,
-    }
-
-    impl TestTool {
-        pub fn new(might_write: &[Id]) -> (TestTool, Sender<Behavior>) {
-            let (sender, receiver) = channel();
-            (
-                TestTool {
-                    might_write: might_write.iter().copied().collect(),
-                    receiver,
-                },
-                sender,
-            )
-        }
-    }
-
-    impl Tool for TestTool {
-        fn might_write(&mut self, _ir: &HarvestIR) -> Option<HashSet<Id>> {
-            Some(take(&mut self.might_write))
-        }
-        fn run(&mut self, context: Context) -> Result<(), Box<dyn Error>> {
-            // Add a new representation so the test case can check whether the Edit was applied.
-            context
-                .ir_edit
-                .add_representation(RawSource(RawDir::default()));
-            match self.receiver.recv().expect("sender dropped") {
-                Behavior::Error => Err("test error".into()),
-                Behavior::Panic => panic!("test panic"),
-                Behavior::SwapEdit(edit) => {
-                    // Apply the edit passed through the channel.
-                    *context.ir_edit = edit;
-                    Ok(())
-                }
-                Behavior::Success => Ok(()),
-            }
-        }
-    }
-
-    enum Behavior {
-        Error,          // Return Err(_)
-        Panic,          // Panics
-        SwapEdit(Edit), // Swaps the tool's Edit with another one.
-        Success,        // Returns Ok(())
-    }
 
     #[test]
     fn new_edit_errors() {
@@ -172,37 +139,46 @@ mod tests {
         edit_organizer.apply_edit(edit).expect("setup edit failed");
         let mut runner = ToolRunner::default();
         let unknown_id = Id::new();
-        let (tool, _) = TestTool::new(&[a, unknown_id]);
         let snapshot = edit_organizer.snapshot();
         assert_eq!(
             runner
                 .spawn_tool(
                     &mut edit_organizer,
-                    Box::new(tool),
+                    MockTool::new().might_write(move |_| Runnable([a, unknown_id].into())),
                     snapshot.clone(),
                     [a, unknown_id].into()
                 )
-                .err(),
+                .err()
+                .map(|e| e.cause),
             Some(NewEditError::UnknownId)
         );
-        let (tool, sender) = TestTool::new(&[a, b]);
-        runner
-            .spawn_tool(
-                &mut edit_organizer,
-                Box::new(tool),
-                snapshot.clone(),
-                [a, b].into(),
-            )
-            .expect("tool spawn failed");
-        let (tool, _) = TestTool::new(&[b, c]);
+        let (sender, receiver) = channel();
+        assert!(
+            runner
+                .spawn_tool(
+                    &mut edit_organizer,
+                    MockTool::new()
+                        .might_write(move |_| Runnable([b, c].into()))
+                        .run(move |_| { receiver.recv().map_err(Into::into) }),
+                    snapshot.clone(),
+                    [a, b].into(),
+                )
+                .is_ok()
+        );
         assert_eq!(
             runner
-                .spawn_tool(&mut edit_organizer, Box::new(tool), snapshot, [b, c].into())
-                .err(),
+                .spawn_tool(
+                    &mut edit_organizer,
+                    MockTool::new().might_write(move |_| Runnable([b, c].into())),
+                    snapshot,
+                    [b, c].into()
+                )
+                .err()
+                .map(|e| e.cause),
             Some(NewEditError::IdInUse),
             "spawned tool with in-use ID"
         );
-        sender.send(Behavior::Success).expect("receiver dropped");
+        sender.send(()).expect("receiver dropped");
         runner.process_tool_results(&mut edit_organizer);
     }
 
@@ -213,18 +189,26 @@ mod tests {
         let a = edit.add_representation(RawSource(RawDir::default()));
         edit_organizer.apply_edit(edit).expect("setup edit failed");
         let mut runner = ToolRunner::default();
-        let (tool, sender) = TestTool::new(&[a]);
+        let (sender, receiver) = channel();
         let snapshot = edit_organizer.snapshot();
         runner
-            .spawn_tool(&mut edit_organizer, Box::new(tool), snapshot, [a].into())
+            .spawn_tool(
+                &mut edit_organizer,
+                MockTool::new()
+                    .might_write(move |_| Runnable([a].into()))
+                    .run(move |c| {
+                        *c.ir_edit = receiver.recv()?;
+                        Ok(())
+                    }),
+                snapshot,
+                [a].into(),
+            )
             .expect("tool spawn failed");
         // Verify that `a` was marked as in use
         assert!(edit_organizer.new_edit(&[a].into()).err() == Some(NewEditError::IdInUse));
         let mut edit = edit_organizer.new_edit(&[].into()).unwrap();
         let b = edit.add_representation(RawSource(RawDir::default()));
-        sender
-            .send(Behavior::SwapEdit(edit))
-            .expect("receiver dropped");
+        sender.send(edit).expect("receiver dropped");
         runner.process_tool_results(&mut edit_organizer);
         let ir_ids: Vec<Id> = edit_organizer.snapshot().iter().map(|(id, _)| id).collect();
         // We don't really need this *exact* behavior, but we do need to verify the runner does
@@ -236,12 +220,18 @@ mod tests {
     fn success() {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
-        let (tool, sender) = TestTool::new(&[]);
         let snapshot = edit_organizer.snapshot();
         runner
-            .spawn_tool(&mut edit_organizer, Box::new(tool), snapshot, [].into())
+            .spawn_tool(
+                &mut edit_organizer,
+                MockTool::new().run(|c| {
+                    c.ir_edit.add_representation(RawSource(RawDir::default()));
+                    Ok(())
+                }),
+                snapshot,
+                [].into(),
+            )
             .expect("tool spawn failed");
-        sender.send(Behavior::Success).expect("receiver dropped");
         let ir_count = edit_organizer.snapshot().iter().count();
         assert_eq!(ir_count, 0, "edit applied early");
         runner.process_tool_results(&mut edit_organizer);
@@ -253,12 +243,15 @@ mod tests {
     fn tool_error() {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
-        let (tool, sender) = TestTool::new(&[]);
         let snapshot = edit_organizer.snapshot();
         runner
-            .spawn_tool(&mut edit_organizer, Box::new(tool), snapshot, [].into())
+            .spawn_tool(
+                &mut edit_organizer,
+                MockTool::new().run(|_| Err("test error".into())),
+                snapshot,
+                [].into(),
+            )
             .expect("tool spawn failed");
-        sender.send(Behavior::Error).expect("receiver dropped");
         runner.process_tool_results(&mut edit_organizer);
         let ir_count = edit_organizer.snapshot().iter().count();
         assert_eq!(ir_count, 0, "edit applied when tool errored");
@@ -268,12 +261,15 @@ mod tests {
     fn tool_panic() {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
-        let (tool, sender) = TestTool::new(&[]);
         let snapshot = edit_organizer.snapshot();
         runner
-            .spawn_tool(&mut edit_organizer, Box::new(tool), snapshot, [].into())
+            .spawn_tool(
+                &mut edit_organizer,
+                MockTool::new().run(|_| panic!("test panic")),
+                snapshot,
+                [].into(),
+            )
             .expect("tool spawn failed");
-        sender.send(Behavior::Panic).expect("receiver dropped");
         runner.process_tool_results(&mut edit_organizer);
         let ir_count = edit_organizer.snapshot().iter().count();
         assert_eq!(ir_count, 0, "edit applied when tool panicked");

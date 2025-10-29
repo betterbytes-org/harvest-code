@@ -8,13 +8,19 @@ mod test_util;
 
 use cli::get_config;
 use harvest_ir::edit::{self, NewEditError};
-use runner::ToolRunner;
-use scheduler::{InvocationOutcome, Scheduler};
-use tools::{ToolInvocation, load_raw_source};
+use log::{debug, error, info};
+use runner::{SpawnToolError, ToolRunner};
+use scheduler::Scheduler;
+use tools::MightWriteContext;
+use tools::MightWriteOutcome;
+use tools::Tool;
+use tools::load_raw_source::LoadRawSource;
+use tools::raw_source_to_cargo_llm::RawSourceToCargoLlm;
+use tools::try_cargo_build::TryCargoBuild;
 
 fn main() {
     if let Err(e) = run() {
-        log::error!("{}", e);
+        error!("{}", e);
         std::process::exit(1);
     }
 }
@@ -27,28 +33,46 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut ir_organizer = edit::Organizer::default();
     let mut runner = ToolRunner::default();
     let mut scheduler = Scheduler::default();
-    scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
-        directory: get_config().input.clone(),
-    }));
-    scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
-    scheduler.queue_invocation(ToolInvocation::TryCargoBuild);
+    scheduler.queue_invocation(Box::new(LoadRawSource::new(&get_config().input.clone())));
+    scheduler.queue_invocation(Box::new(RawSourceToCargoLlm));
+    scheduler.queue_invocation(Box::new(TryCargoBuild));
     loop {
         let snapshot = ir_organizer.snapshot();
-        scheduler.next_invocations(|invocation| {
-            let mut tool = invocation.create_tool();
-            let Some(might_write) = tool.might_write(&snapshot) else {
-                // TODO: Add a tool name to the `Tool` trait so that we can output a message like
-                // "Tool X not currently runnable").
-                return InvocationOutcome::Wait;
+        scheduler.next_invocations(|mut tool| {
+            let name = tool.name();
+            let might_write = match tool.might_write(MightWriteContext { ir: &snapshot }) {
+                MightWriteOutcome::NotRunnable => {
+                    debug!("Tool {name} is not runnable");
+                    return None;
+                }
+                MightWriteOutcome::Runnable(might_write) => {
+                    debug!("Tool {name} is runnable");
+                    might_write
+                }
+                MightWriteOutcome::TryAgain => {
+                    debug!("Tool {name} returned TryAgain");
+                    return Some(tool);
+                }
             };
             match runner.spawn_tool(&mut ir_organizer, tool, snapshot.clone(), might_write) {
-                Err(NewEditError::IdInUse) => InvocationOutcome::Wait,
-                Err(NewEditError::UnknownId) => {
-                    // TODO: Tool name for diagnostics.
-                    log::error!("Tool::might_write returned an unknown ID");
-                    InvocationOutcome::Discard
+                Err(SpawnToolError {
+                    cause: NewEditError::IdInUse,
+                    tool,
+                }) => {
+                    debug!("Not spawning {name} because an ID it needs is in use.");
+                    Some(tool)
                 }
-                Ok(()) => InvocationOutcome::Success,
+                Err(SpawnToolError {
+                    cause: NewEditError::UnknownId,
+                    tool: _,
+                }) => {
+                    error!("Tool {name}: might_write returned an unknown ID");
+                    None
+                }
+                Ok(()) => {
+                    info!("Launched tool {name}");
+                    None
+                }
             }
         });
         if !runner.process_tool_results(&mut ir_organizer) {
@@ -59,6 +83,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     let ir = ir_organizer.snapshot();
-    log::info!("{}", ir);
+    info!("{}", ir);
     Ok(())
 }

@@ -6,11 +6,8 @@ use crate::cli::unknown_field_warning;
 use harvest_ir::{Edit, HarvestIR, Id};
 use serde::Deserialize;
 use serde_json::Value;
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -27,63 +24,57 @@ impl Config {
     }
 }
 
-/// A tool invocation that the scheduler could choose to perform.
-pub enum ToolInvocation {
-    LoadRawSource(load_raw_source::Args),
-    RawSourceToCargoLlm,
-    TryCargoBuild,
-}
-
-impl ToolInvocation {
-    pub fn create_tool(&self) -> Box<dyn Tool> {
-        match self {
-            Self::LoadRawSource(args) => Box::new(load_raw_source::LoadRawSource::new(args)),
-            Self::RawSourceToCargoLlm => Box::new(raw_source_to_cargo_llm::RawSourceToCargoLlm),
-            Self::TryCargoBuild => Box::new(crate::tools::try_cargo_build::TryCargoBuild),
-        }
-    }
-}
-
-impl Display for ToolInvocation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            Self::RawSourceToCargoLlm => f.write_str("RawSourceToCargoLlm"),
-            Self::LoadRawSource(args) => write!(f, "LoadRawSource({})", args.directory.display()),
-            Self::TryCargoBuild => f.write_str("TryCargoBuild"),
-        }
-    }
-}
-
 /// Trait implemented by each tool. Used by the scheduler to decide what tools
 /// to run and to manage those tools.
 ///
 /// An instance of Tool represents a particular invocation of that tool (i.e.
-/// certain arguments and a certain initial IR state). The scheduler constructs
-/// a Tool when it is considering running that tool, and then decides whether to
-/// invoke the tool based on which parts of the IR it writes.
+/// certain arguments and a certain initial IR state). The scheduler -- or other code -- constructs
+/// a Tool when it is considering running that tool. The scheduler then decides whether to invoke
+/// the tool based on which parts of the IR it writes.
 ///
 /// The tool's constructor does not appear in the Tool trait, because at the
 /// time the scheduler constructs the tool it is aware of the tool's concrete
-/// type. Tool is Send because we will likely eventually run tools concurrently,
-/// and at that point the scheduler will spawn a new thread for each tool it
-/// chooses to invoke. Tool is also intentionally dyn compatible.
+/// type.
 pub trait Tool: Send {
-    /// Returns the IDs this tool may write, or `None` if it is unable to run on
-    /// on this IR.
+    /// This tool's name.
+    fn name(&self) -> &'static str;
+
+    /// Returns an indication of whether the tool can be run now, and if it can be run, which IDs
+    /// it might write. The IDs returned may depend on the tool constructor's arguments as well as
+    /// the contents of `context.ir`.
     ///
-    /// The IDs returned may depend on the tool constructor's arguments as well
-    /// as the contents of `ir`. Reasons might_write might return `None` include
-    /// but are not limited to:
-    /// 1. The tool requires input data that `ir` does not have.
-    /// 2. The tool creates data that already exists in `ir` so there is nothing
-    ///    to do.
-    fn might_write(&mut self, ir: &HarvestIR) -> Option<HashSet<Id>>;
+    /// might_write may be called multiple times before the tool is run. Returning
+    /// `MightWriteOutcome::Runnable` does not guarantee that this tool will be executed.
+    fn might_write(&mut self, context: MightWriteContext) -> MightWriteOutcome;
 
     /// Runs the tool logic. IR access and edits are made using `context`.
     ///
     /// If `Ok` is returned the changes will be applied to the IR, and if `Err`
     /// is returned the changes will not be applied.
-    fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>>;
+    fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>>;
+}
+
+/// Context passed to `Tool::might_write`. This is a struct so that new values may be added without
+/// having to edit every Tool impl.
+#[non_exhaustive]
+pub struct MightWriteContext<'a> {
+    /// Snapshot of the HarvestIR.
+    pub ir: &'a HarvestIR,
+}
+
+/// Result of a `Tool::might_write` execution.
+pub enum MightWriteOutcome {
+    /// This tool is not and will not be runnable. Tells the scheduler to discard the tool.
+    #[allow(unused)] // TODO: Remove when we have a tool that returns this.
+    NotRunnable,
+
+    /// This tool is runnable. The set of IDs returned are the IDs for representations in the
+    /// HarvestIR that the tool might write if it is run.
+    Runnable(HashSet<Id>),
+
+    /// The tool cannot be run now (e.g. it might need input data that it did not find in the IR),
+    /// but it might become runnable in the future so the scheduler should try again later.
+    TryAgain,
 }
 
 /// Context a tool is provided when it is running. The tool uses this context to
@@ -91,14 +82,12 @@ pub trait Tool: Send {
 /// diagnostics), and anything else that requires hooking into the rest of
 /// harvest_translate.
 #[non_exhaustive]
-pub struct Context<'a> {
+pub struct RunContext<'a> {
     /// A set of changes to be applied to the IR when this tool completes
     /// successfully.
     pub ir_edit: &'a mut Edit,
 
     /// Read access to the IR. This will be the same IR as `might_write` was
-    /// called with.
-    // TODO: Remove once a tool has been implemented.
-    #[allow(unused)]
+    /// most recently called with.
     pub ir_snapshot: Arc<HarvestIR>,
 }
