@@ -13,13 +13,27 @@ describes the intended design, not the current state of its implementation.
 
 `harvest_translate` has the following main components:
 
+* **Main Loop:** Calls out to the other components to invoke tools and process
+  their results, repeating until done.
 * **Tools:** A collection of operations that perform lifting, lowering,
   analysis, testing, or other operations on the IR.
-* **Scheduler:** Understands the available resources (CPUs, GPUs, etc). Looks at
-  signals about which operations need to be done and decides which tools to run
-  when.
+* **Scheduler:** Determines which tool invocations are should be tried next.
 * **Diagnostics:** Produces output that HARVEST developers can use to understand
   what happened during a particular `harvest_translate` invocation.
+* **IR Storage:** Stores the HarvestIR and manages edits to it.
+* **Tool Runner:** Manager threads for each tool invocation, executes the tools,
+  and handles tool results (whether they succeed or error).
+
+### Main Loop
+
+Conceptually, the main loop:
+
+1. Fetches desirable tool invocations from the scheduler.
+2. Determines whether the tool can be invoked by calling into the IR storage and
+   other components.
+3. Passes tools that should be invoked to the tool runner for execution.
+4. Waits for tools to complete.
+5. Repeats until done.
 
 ### Tools
 
@@ -42,22 +56,9 @@ de-conflict tool invocations.
 
 ### Scheduler
 
-The scheduler understands what resources `harvest_translate` has available to it
-(CPU cores, GPU servers, maybe RAM limits if they become an issue, etc.), which
-parts of the IR will be modified by tools that are currently running, and the
-operation suggestions provided by tools.
-
-The scheduler is invoked at the start of operation and each time a tool
-completes. Each invocation, the scheduler:
-
-1. Produces some sort of list/sequence/iterator of candidate tool invocations.
-2. Rules out invocations that `harvest_translate` does not currently have the
-   resources to execute.
-3. Calls the tool's IR access API (mentioned in Tools above) to determine what
-   portions of the IR it will write.
-4. Determines whether that tool will write a portion of the IR that another tool
-   is concurrently writing.
-5. Performs tool invocations that pass the above checks.
+The scheduler is responsible for telling the main loop which tools it should try
+invoking. It keeps a track of suggested tool invocations, and may also have
+logic to suggest tool invocations itself.
 
 ### Diagnostics
 
@@ -67,7 +68,7 @@ Its outputs include:
 
 * Why each tool was selected.
 * Inputs and outputs of each tool. Ideally, these would allow developers to
-  easily reproduce that tool' operation (e.g. if an external binary is invoked,
+  easily reproduce that tool's operation (e.g. if an external binary is invoked,
   its command line arguments should be in the diagnostic output).
 * A history of the HARVEST-IR changes. Example use case: suppose a developer
   discovered that a particular IR invariant was broken during execution. They
@@ -85,10 +86,9 @@ The diagnostic output is emitted to a directory. It will have at least the
 following subdirectories:
 
 * `ir/` Contains all the revisions of the HARVEST-IR. The first revision
-  (after the input project is loaded but before any tool invocations) will be
-  named `0000` (field width to be extended as necessary to keep them all the
-  same size). The second revision (after the first tool invocation) will be
-  `0001`, etc.
+  (after the input project is loaded) will be named `0000` (field width to be
+  extended as necessary to keep them all the same size). The second revision
+  (after the first tool invocation) will be `0001`, etc.
 * `steps/` Contains a subdirectory for each tool invocation. The name of each
   subdirectory is the same as the name of the IR revision immediately after that
   tool finishes. As a result, `0000` will be skipped and the subdirectory
@@ -98,7 +98,7 @@ following subdirectories:
   - `end_ir` A symlink to the IR revision the tool was completed with.
   - `messages` A file with diagnostic messages produced by that tool invocation
     (`harvest_translate` should provide each tool with something it can
-    `writeln!()` to).
+    `writeln!()` to or a similar logging framework).
   - For each external binary invoked, a subdirectory (name TBD) containing:
     * `cmd` Command line arguments for the tool.
     * `stdout` The program's standard output and error.
