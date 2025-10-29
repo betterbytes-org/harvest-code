@@ -28,7 +28,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut runner = ToolRunner::default();
     let mut scheduler = Scheduler::default();
     scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
-        directory: get_config().in_performer.clone(),
+        directory: get_config().input.clone(),
     }));
     scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
     scheduler.queue_invocation(ToolInvocation::TryCargoBuild);
