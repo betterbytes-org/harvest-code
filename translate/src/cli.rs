@@ -113,16 +113,15 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
             .expect("settings override failed");
     }
 
-    // At this point, we are committed to actually translating code (rather than say, printing a config path)
-    // and we therefore need to have an input directory present.
-    assert!(args.input.is_some(), "No input directory provided");
     // We need to set an override so that deserializing the config does not error.
     // However, the config crate does not support providing a Path in an override.
     // We could convert to a string and back, but that can be lossy. Instead, this just sets a
     // blank value and then corrects it after deserialization.
-    settings = settings
-        .set_override("input", " ")
-        .expect("settings override failed");
+    if args.input.is_some() {
+        settings = settings
+            .set_override("input", " ")
+            .expect("settings override failed");
+    }
 
     if args.output.is_some() {
         settings = settings
@@ -172,7 +171,7 @@ mod tests {
             .unwrap()
             .write(
                 br#"
-                    output = "b"
+                    input = "b"
                     [tools.raw_source_to_cargo_llm]
                     address = "127.0.0.1"
                     model = "gpt-oss"
@@ -180,17 +179,30 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            load_config(&Args::parse_from(["", "a"]), config_dir.path()).output,
+            load_config(
+                &Args::parse_from(["", "--output=/tmp/out"]),
+                config_dir.path()
+            )
+            .input,
             AsRef::<Path>::as_ref("b")
         );
         // Verify the --config flag overrides the user's config file.
         assert_eq!(
             load_config(
-                &Args::parse_from(["", "--config", "output=c", "a"]),
+                &Args::parse_from(["", "--config", "input=c", "--output=/tmp/out"]),
                 config_dir.path()
             )
-            .output,
+            .input,
             AsRef::<Path>::as_ref("c")
+        );
+        // Verify --input overrides all the configuration options.
+        assert_eq!(
+            load_config(
+                &Args::parse_from(["", "--config", "input=d", "d", "--output=/tmp/out"]),
+                config_dir.path()
+            )
+            .input,
+            AsRef::<Path>::as_ref("d")
         );
     }
 }
