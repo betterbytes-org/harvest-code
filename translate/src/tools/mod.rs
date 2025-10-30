@@ -35,7 +35,7 @@ impl Config {
 /// The tool's constructor does not appear in the Tool trait, because at the
 /// time the scheduler constructs the tool it is aware of the tool's concrete
 /// type.
-pub trait Tool: Send {
+pub trait Tool: Send + 'static {
     /// This tool's name.
     fn name(&self) -> &'static str;
 

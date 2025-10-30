@@ -144,7 +144,9 @@ mod tests {
             runner
                 .spawn_tool(
                     &mut edit_organizer,
-                    MockTool::new().might_write(move |_| Runnable([a, unknown_id].into())),
+                    MockTool::new()
+                        .might_write(move |_| Runnable([a, unknown_id].into()))
+                        .boxed(),
                     snapshot.clone(),
                     [a, unknown_id].into()
                 )
@@ -159,7 +161,8 @@ mod tests {
                     &mut edit_organizer,
                     MockTool::new()
                         .might_write(move |_| Runnable([b, c].into()))
-                        .run(move |_| { receiver.recv().map_err(Into::into) }),
+                        .run(move |_| { receiver.recv().map_err(Into::into) })
+                        .boxed(),
                     snapshot.clone(),
                     [a, b].into(),
                 )
@@ -169,7 +172,9 @@ mod tests {
             runner
                 .spawn_tool(
                     &mut edit_organizer,
-                    MockTool::new().might_write(move |_| Runnable([b, c].into())),
+                    MockTool::new()
+                        .might_write(move |_| Runnable([b, c].into()))
+                        .boxed(),
                     snapshot,
                     [b, c].into()
                 )
@@ -199,7 +204,8 @@ mod tests {
                     .run(move |c| {
                         *c.ir_edit = receiver.recv()?;
                         Ok(())
-                    }),
+                    })
+                    .boxed(),
                 snapshot,
                 [a].into(),
             )
@@ -224,10 +230,12 @@ mod tests {
         runner
             .spawn_tool(
                 &mut edit_organizer,
-                MockTool::new().run(|c| {
-                    c.ir_edit.add_representation(RawSource(RawDir::default()));
-                    Ok(())
-                }),
+                MockTool::new()
+                    .run(|c| {
+                        c.ir_edit.add_representation(RawSource(RawDir::default()));
+                        Ok(())
+                    })
+                    .boxed(),
                 snapshot,
                 [].into(),
             )
@@ -247,7 +255,7 @@ mod tests {
         runner
             .spawn_tool(
                 &mut edit_organizer,
-                MockTool::new().run(|_| Err("test error".into())),
+                MockTool::new().run(|_| Err("test error".into())).boxed(),
                 snapshot,
                 [].into(),
             )
@@ -265,7 +273,7 @@ mod tests {
         runner
             .spawn_tool(
                 &mut edit_organizer,
-                MockTool::new().run(|_| panic!("test panic")),
+                MockTool::new().run(|_| panic!("test panic")).boxed(),
                 snapshot,
                 [].into(),
             )

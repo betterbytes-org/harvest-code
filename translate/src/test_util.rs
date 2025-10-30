@@ -36,35 +36,39 @@ pub struct MockTool {
 impl MockTool {
     /// Creates a new MockTool. The MockTool is boxed, because most users of MockTool will use it
     /// to create a `Box<dyn Tool>`.
-    pub fn new() -> Box<MockTool> {
+    pub fn new() -> MockTool {
         MockTool {
             name: "MockTool",
             might_write: Box::new(|_| MightWriteOutcome::Runnable([].into())),
             run: Box::new(|_| Ok(())),
         }
-        .into()
+    }
+
+    /// Returns this MockTool in a box. For use when a `Box<dyn Tool>` is needed.
+    pub fn boxed(self) -> Box<MockTool> {
+        self.into()
     }
 
     /// Sets a closure to be run when `Tool::might_write` is called.
     pub fn might_write<F: FnMut(MightWriteContext) -> MightWriteOutcome + Send + 'static>(
-        mut self: Box<MockTool>,
+        mut self,
         f: F,
-    ) -> Box<MockTool> {
+    ) -> MockTool {
         self.might_write = Box::new(f);
         self
     }
 
     /// Sets the return value of `Tool::name`.
-    pub fn name(mut self: Box<MockTool>, name: &'static str) -> Box<MockTool> {
+    pub fn name(mut self, name: &'static str) -> MockTool {
         self.name = name;
         self
     }
 
     /// Sets a closure to be run when `Tool::run` is called.
     pub fn run<F: FnOnce(RunContext) -> Result<(), Box<dyn Error>> + Send + 'static>(
-        mut self: Box<MockTool>,
+        mut self,
         f: F,
-    ) -> Box<MockTool> {
+    ) -> MockTool {
         self.run = Box::new(f);
         self
     }

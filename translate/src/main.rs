@@ -33,9 +33,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut ir_organizer = edit::Organizer::default();
     let mut runner = ToolRunner::default();
     let mut scheduler = Scheduler::default();
-    scheduler.queue_invocation(Box::new(LoadRawSource::new(&get_config().input.clone())));
-    scheduler.queue_invocation(Box::new(RawSourceToCargoLlm));
-    scheduler.queue_invocation(Box::new(TryCargoBuild));
+    scheduler.queue_invocation(LoadRawSource::new(&get_config().input.clone()));
+    scheduler.queue_invocation(RawSourceToCargoLlm);
+    scheduler.queue_invocation(TryCargoBuild);
     loop {
         let snapshot = ir_organizer.snapshot();
         scheduler.next_invocations(|mut tool| {

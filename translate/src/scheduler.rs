@@ -32,8 +32,8 @@ impl Scheduler {
     /// Add a tool invocation to the scheduler's queue. Note that scheduling a
     /// tool invocation does not guarantee the tool will run, as a tool may
     /// indicate that it is not runnable.
-    pub fn queue_invocation(&mut self, invocation: Box<dyn Tool>) {
-        self.queued_invocations.push(invocation);
+    pub fn queue_invocation<T: Tool>(&mut self, invocation: T) {
+        self.queued_invocations.push(Box::new(invocation));
     }
 }
 
