@@ -6,7 +6,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 #[derive(Debug, Parser)]
 pub struct Args {
@@ -48,7 +48,7 @@ pub struct Config {
     pub output: PathBuf,
 
     /// Sub-configuration for each tool.
-    pub tools: tools::Config,
+    pub tools: tools::ToolConfigs,
 
     // serde will place any unrecognized fields here. This will be passed to unknown_field_warning
     // after parsing to emit warnings on unrecognized config entries (we don't error on unknown
@@ -56,34 +56,6 @@ pub struct Config {
     // commits that have different config options).
     #[serde(flatten)]
     unknown: HashMap<String, Value>,
-}
-
-/// Returns the configuration.
-pub fn get_config() -> Arc<Config> {
-    CONFIG
-        .get()
-        .expect("configuration not initialized yet")
-        .clone()
-}
-
-/// Performs parsing and validation of the config; to be called by main() before executing any code
-/// that tries to retrieve the config.
-///
-/// Returns true if a command line flag that calls for an early exit (such as --print_config_path)
-/// was provided.
-pub fn initialize() -> bool {
-    let args: Arc<_> = Args::parse().into();
-    ARGS.set(args.clone()).expect("cli already initialized");
-    let dirs = ProjectDirs::from("", "", "harvest").expect("no home directory");
-    if args.print_config_path {
-        println!("Config file location: {:?}", config_file(dirs.config_dir()));
-        return true;
-    }
-    let config = load_config(&args, dirs.config_dir());
-    unknown_field_warning("", &config.unknown);
-    config.tools.validate();
-    CONFIG.set(config.into()).expect("cli already initialized");
-    false
 }
 
 /// Prints out a warning message for every field in `unknown`.
@@ -99,8 +71,23 @@ pub fn unknown_field_warning(prefix: &str, unknown: &HashMap<String, Value>) {
     });
 }
 
-static ARGS: OnceLock<Arc<Args>> = OnceLock::new();
-static CONFIG: OnceLock<Arc<Config>> = OnceLock::new();
+/// Performs parsing and validation of the config; to be called by main() before executing any code
+/// that tries to retrieve the config.
+///
+/// Returns the config, or None if a command line flag that calls for an early exit (such as --print_config_path)
+/// was provided.
+pub fn initialize() -> Option<Arc<Config>> {
+    let args: Arc<_> = Args::parse().into();
+    let dirs = ProjectDirs::from("", "", "harvest").expect("no home directory");
+    if args.print_config_path {
+        println!("Config file location: {:?}", config_file(dirs.config_dir()));
+        return None;
+    }
+    let config = load_config(&args, dirs.config_dir());
+    unknown_field_warning("", &config.unknown);
+    config.tools.validate();
+    Some(config.into())
+}
 
 fn load_config(args: &Args, config_dir: &Path) -> Config {
     let mut settings = config::Config::builder()

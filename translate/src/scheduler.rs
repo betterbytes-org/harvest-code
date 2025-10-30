@@ -11,6 +11,7 @@ use std::sync::Arc;
 pub struct Scheduler {
     ir: Arc<HarvestIR>,
     queued_invocations: Vec<ToolInvocation>,
+    config: Option<Arc<crate::cli::Config>>,
 }
 
 impl Scheduler {
@@ -19,8 +20,19 @@ impl Scheduler {
         self.ir.clone()
     }
 
+    /// Sets the configuration for this scheduler.
+    pub fn set_config(&mut self, config: Arc<crate::cli::Config>) {
+        self.config = Some(config);
+    }
+
     /// The scheduler main loop -- invokes tools until done.
     pub fn main_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let config = self
+            .config
+            .as_ref()
+            .expect("config not set on scheduler")
+            .clone();
+
         // TODO: This is just a temporary implementation to make the
         // LoadRawSource invocation run; this all needs to be restructured to
         // fit the design doc.
@@ -43,6 +55,7 @@ impl Scheduler {
             tool.run(Context {
                 ir_edit: &mut ir_edit,
                 ir_snapshot: self.ir.clone(),
+                config: config.clone(),
             })
             .map_err(|e| {
                 log::debug!("Invoking {invocation} failed: {e}");

@@ -1,7 +1,7 @@
 //! Attempts to directly turn a C project into a Cargo project by throwing it at
 //! an LLM via the `llm` crate.
 
-use crate::cli::{get_config, unknown_field_warning};
+use crate::cli::unknown_field_warning;
 use crate::tools::{Context, Tool};
 use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
@@ -27,7 +27,7 @@ impl Tool for RawSourceToCargoLlm {
     }
 
     fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>> {
-        let config = &get_config().tools.raw_source_to_cargo_llm;
+        let config = &context.config.tools.raw_source_to_cargo_llm;
         log::debug!("LLM Configuration {config:?}");
         let in_dir = raw_source(&context.ir_snapshot).unwrap();
 

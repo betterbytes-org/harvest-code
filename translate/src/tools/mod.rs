@@ -13,14 +13,14 @@ use std::{
 };
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
+pub struct ToolConfigs {
     raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
 
     #[serde(flatten)]
     unknown: HashMap<String, Value>,
 }
 
-impl Config {
+impl ToolConfigs {
     pub fn validate(&self) {
         unknown_field_warning("tools", &self.unknown);
         self.raw_source_to_cargo_llm.validate();
@@ -101,4 +101,7 @@ pub struct Context<'a> {
     // TODO: Remove once a tool has been implemented.
     #[allow(unused)]
     pub ir_snapshot: Arc<HarvestIR>,
+
+    /// Configuration for the current harvest_translate run.
+    pub config: Arc<crate::cli::Config>,
 }
