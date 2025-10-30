@@ -2,13 +2,13 @@
 //! an LLM via the `llm` crate.
 
 use crate::cli::{get_config, unknown_field_warning};
-use crate::tools::{Context, Tool};
-use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
+use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
+use harvest_ir::{HarvestIR, Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
 use llm::chat::{ChatMessage, StructuredOutputFormat};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -21,12 +21,19 @@ const SYSTEM_PROMPT: &str = include_str!("raw_source_to_cargo_llm/system_prompt.
 pub struct RawSourceToCargoLlm;
 
 impl Tool for RawSourceToCargoLlm {
-    fn might_write(&mut self, ir: &HarvestIR) -> Option<HashSet<Id>> {
-        // We need a raw_source to be available, but we won't write any existing IDs.
-        raw_source(ir).map(|_| [].into())
+    fn name(&self) -> &'static str {
+        "RawSourceToCargoLlm"
     }
 
-    fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>> {
+    fn might_write(&mut self, context: MightWriteContext) -> MightWriteOutcome {
+        // We need a raw_source to be available, but we won't write any existing IDs.
+        match raw_source(context.ir) {
+            None => MightWriteOutcome::TryAgain,
+            Some(_) => MightWriteOutcome::Runnable([].into()),
+        }
+    }
+
+    fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
         let config = &get_config().tools.raw_source_to_cargo_llm;
         log::debug!("LLM Configuration {config:?}");
         let in_dir = raw_source(&context.ir_snapshot).unwrap();
