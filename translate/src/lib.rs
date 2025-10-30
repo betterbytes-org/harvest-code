@@ -1,11 +1,18 @@
 pub mod cli;
+pub mod runner;
 pub mod scheduler;
+#[cfg(test)]
+mod test_util;
 pub mod tools;
 
 #[cfg(test)]
 mod test_util;
 
-use scheduler::Scheduler;
+use harvest_ir::HarvestIR;
+use harvest_ir::edit::{self, NewEditError};
+use runner::ToolRunner;
+use scheduler::{InvocationOutcome, Scheduler};
+use std::sync::Arc;
 use tools::{ToolInvocation, load_raw_source};
 
 /// Performs the complete transpilation process using the scheduler.
@@ -13,16 +20,49 @@ use tools::{ToolInvocation, load_raw_source};
 /// This function sets up a scheduler with the necessary tool invocations
 /// to load raw source, convert to Cargo LLM format, attempt a build,
 /// and return the IR snapshot.
-pub fn transpile(config: std::sync::Arc<cli::Config>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn transpile(
+    config: std::sync::Arc<cli::Config>,
+) -> Result<Arc<HarvestIR>, Box<dyn std::error::Error>> {
+    let mut ir_organizer = edit::Organizer::default();
+    let mut runner = ToolRunner::default();
     let mut scheduler = Scheduler::default();
-    scheduler.set_config(config.clone());
+    // scheduler.set_config(config.clone());
     scheduler.queue_invocation(ToolInvocation::LoadRawSource(load_raw_source::Args {
-        directory: config.in_performer.clone(),
+        directory: config.input.clone(),
     }));
     scheduler.queue_invocation(ToolInvocation::RawSourceToCargoLlm);
     scheduler.queue_invocation(ToolInvocation::TryCargoBuild);
-    scheduler.main_loop()?;
-    let ir = scheduler.ir_snapshot();
-    log::info!("{}", ir);
-    Ok(())
+    loop {
+        let snapshot = ir_organizer.snapshot();
+        scheduler.next_invocations(|invocation| {
+            let mut tool = invocation.create_tool();
+            let Some(might_write) = tool.might_write(&snapshot) else {
+                // TODO: Add a tool name to the `Tool` trait so that we can output a message like
+                // "Tool X not currently runnable").
+                return InvocationOutcome::Wait;
+            };
+            match runner.spawn_tool(
+                &mut ir_organizer,
+                tool,
+                snapshot.clone(),
+                might_write,
+                config.clone(),
+            ) {
+                Err(NewEditError::IdInUse) => InvocationOutcome::Wait,
+                Err(NewEditError::UnknownId) => {
+                    // TODO: Tool name for diagnostics.
+                    log::error!("Tool::might_write returned an unknown ID");
+                    InvocationOutcome::Discard
+                }
+                Ok(()) => InvocationOutcome::Success,
+            }
+        });
+        if !runner.process_tool_results(&mut ir_organizer) {
+            // No tools are running now, which also indicates that no tools are schedulable.
+            // Eventually we need some way to determine whether this is a successful outcome or a
+            // failure, but for now we can just assume success.
+            break;
+        }
+    }
+    Ok(ir_organizer.snapshot())
 }

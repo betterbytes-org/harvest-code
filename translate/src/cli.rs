@@ -14,15 +14,15 @@ pub struct Args {
     #[arg(long, short)]
     pub config: Vec<String>,
 
-    /// Path to the C code to translate. This path should be a directory in the
-    /// project structure defined by the TRACTOR_Performers library.
-    #[arg(long)]
-    pub in_performer: Option<PathBuf>,
+    /// Path to the directory containing the C code to translate.
+    // Should always be present unless using a subcommand like --print-config-path
+    pub input: Option<PathBuf>,
 
     /// Prints out the location of the config file.
     #[arg(long)]
     pub print_config_path: bool,
 
+    /// Path to output directory containing the translated Rust code.
     #[arg(short, long)]
     pub output: Option<PathBuf>,
 }
@@ -35,14 +35,8 @@ pub struct Args {
 /// 3. Defaults specified in the code (using `#[serde(default)]`).
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    // Currently, this is the only input format supported, so in_performer is required. However, in
-    // the future, we'll want to be able to take a different input format that conveys more
-    // information (such as the version control history, code review comments, etc). When that
-    // format has been defined, we'll add a separate config option to specify it, and change the
-    // requirement to "specify either in_performer or the other input option".
-    /// Path to the C code to translate. This path should be a directory in the
-    /// project structure defined by the TRACTOR_Performers library.
-    pub in_performer: PathBuf,
+    ///  Path to the directory containing the C code to translate.
+    pub input: PathBuf,
 
     /// Path to output directory.
     pub output: PathBuf,
@@ -105,13 +99,14 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
             .set_override(name, value)
             .expect("settings override failed");
     }
-    // If --in_performer was passed, we need to set an override so that deserializing the config
-    // does not error. However, the config crate does not support providing a Path in an override.
+
+    // We need to set an override so that deserializing the config does not error.
+    // However, the config crate does not support providing a Path in an override.
     // We could convert to a string and back, but that can be lossy. Instead, this just sets a
     // blank value and then corrects it after deserialization.
-    if args.in_performer.is_some() {
+    if args.input.is_some() {
         settings = settings
-            .set_override("in_performer", " ")
+            .set_override("input", " ")
             .expect("settings override failed");
     }
 
@@ -126,8 +121,8 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
         .expect("failed to build settings")
         .try_deserialize()
         .expect("config deserialization failed");
-    if let Some(ref performer) = args.in_performer {
-        config.in_performer = performer.clone();
+    if let Some(ref input) = args.input {
+        config.input = input.clone();
     }
     if let Some(ref output) = args.output {
         config.output = output.clone();
@@ -152,10 +147,10 @@ mod tests {
 
         assert_eq!(
             load_config(
-                &Args::parse_from(["", "--in-performer=a", "--output=/tmp/out"]),
+                &Args::parse_from(["", "a", "--output=/tmp/out"]),
                 config_dir.path(),
             )
-            .in_performer,
+            .input,
             AsRef::<Path>::as_ref("a")
         );
 
@@ -163,7 +158,7 @@ mod tests {
             .unwrap()
             .write(
                 br#"
-                    in_performer = "b"
+                    input = "b"
                     [tools.raw_source_to_cargo_llm]
                     address = "127.0.0.1"
                     model = "gpt-oss"
@@ -175,31 +170,25 @@ mod tests {
                 &Args::parse_from(["", "--output=/tmp/out"]),
                 config_dir.path()
             )
-            .in_performer,
+            .input,
             AsRef::<Path>::as_ref("b")
         );
         // Verify the --config flag overrides the user's config file.
         assert_eq!(
             load_config(
-                &Args::parse_from(["", "--config", "in_performer=c", "--output=/tmp/out"]),
+                &Args::parse_from(["", "--config", "input=c", "--output=/tmp/out"]),
                 config_dir.path()
             )
-            .in_performer,
+            .input,
             AsRef::<Path>::as_ref("c")
         );
-        // Verify --in-performer overrides all the configuration options.
+        // Verify --input overrides all the configuration options.
         assert_eq!(
             load_config(
-                &Args::parse_from([
-                    "",
-                    "--config",
-                    "in_performer=d",
-                    "--in-performer=d",
-                    "--output=/tmp/out"
-                ]),
+                &Args::parse_from(["", "--config", "input=d", "d", "--output=/tmp/out"]),
                 config_dir.path()
             )
-            .in_performer,
+            .input,
             AsRef::<Path>::as_ref("d")
         );
     }

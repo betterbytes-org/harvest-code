@@ -1,7 +1,5 @@
 use harvest_translate::transpile;
-use harvest_translate::{cli, scheduler, tools};
-use scheduler::Scheduler;
-use tools::{ToolInvocation, load_raw_source};
+use harvest_translate::{cli, runner};
 
 fn main() {
     if let Err(e) = run() {
@@ -15,6 +13,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let Some(config) = cli::initialize() else {
         return Ok(()); // An early-exit argument was passed.
     };
-    transpile(config)?;
+    let ir = transpile(config)?;
+    log::info!("{}", ir);
     Ok(())
 }
