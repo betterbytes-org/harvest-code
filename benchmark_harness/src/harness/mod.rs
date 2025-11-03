@@ -1,17 +1,18 @@
+/// This module `harness` is intented to contain code that is specific to a particular set of benchmarks,
+/// for example, parsing code for benchmark-specific configs.
+/// Currently, that is just the MITLL tractor benchmarks.
 use crate::runner;
 use crate::stats::ProgramEvalStats;
 use crate::HarvestResult;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
-/// This module `harness` is intented to contain code that is specific to a particular set of benchmarks,
-/// for example, parsing code for benchmark-specific configs.
-/// Currently, that is just the MITLL tractor benchmarks.
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
 /// Represents the expected stdout pattern in a test case
+/// Used for tractor test cases
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct StdoutPattern {
     pub pattern: String,
@@ -20,6 +21,7 @@ pub struct StdoutPattern {
 }
 
 /// Represents a test case with command arguments, input, and expected output
+/// Used for tractor test cases
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct TestCase {
     #[serde(default)]
@@ -36,14 +38,34 @@ pub struct TestCase {
     pub filename: String,
 }
 
-/// Parses a JSON string into a TestCase struct
-pub fn parse_test_case_json(json_str: &str) -> HarvestResult<TestCase> {
-    let mut test_case: TestCase = serde_json::from_str(json_str)
-        .map_err(|e| format!("Failed to parse test case JSON: {}", e))?;
-    // Initialize filename to empty string - it should be set by the caller
-    if test_case.filename.is_empty() {
-        test_case.filename = String::new();
-    }
+/// Parses a JSON file into a TestCase struct
+pub fn parse_test_case_json<P: AsRef<Path>>(file_path: P) -> HarvestResult<TestCase> {
+    let file_path = file_path.as_ref();
+
+    // Read the JSON content from the file
+    let json_str = fs::read_to_string(file_path).map_err(|e| {
+        format!(
+            "Failed to read test case file {}: {}",
+            file_path.display(),
+            e
+        )
+    })?;
+
+    let mut test_case: TestCase = serde_json::from_str(&json_str).map_err(|e| {
+        format!(
+            "Failed to parse test case JSON from {}: {}",
+            file_path.display(),
+            e
+        )
+    })?;
+
+    // Set the filename field to the file name
+    test_case.filename = file_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("")
+        .to_string();
+
     Ok(test_case)
 }
 
@@ -110,17 +132,9 @@ pub fn parse_test_vectors<P: AsRef<Path>>(directory_path: P) -> HarvestResult<Ve
         })?;
         let file_path = entry.path();
 
-        // Try to read and parse the file as a test case JSON
-        if let Ok(json_content) = fs::read_to_string(&file_path) {
-            if let Ok(mut test_case) = parse_test_case_json(&json_content) {
-                // Set the filename field to the file name
-                test_case.filename = file_path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .unwrap() // Should never happen
-                    .to_string();
-                test_cases.push(test_case);
-            }
+        // Try to parse the file as a test case JSON
+        if let Ok(test_case) = parse_test_case_json(&file_path) {
+            test_cases.push(test_case);
         }
     }
     Ok(test_cases)
@@ -176,7 +190,7 @@ pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &Path) {
         }
     }
 
-    println!("\nAll processing and cleanup complete!");
+    println!("\nDone!");
 }
 
 /// Runs a binary with test case inputs and compares its output against expected values.
