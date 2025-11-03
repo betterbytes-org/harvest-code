@@ -52,7 +52,7 @@ fn cargo_build_result(ir: &HarvestIR) -> Result<Vec<PathBuf>, String> {
     match build_results.len() {
         0 => Err("No artifacts built".into()),
         1 => build_results[0].clone(),
-        n => Err(format!("Found {} build results, expected at most 1", n).into()),
+        n => Err(format!("Found {} build results, expected at most 1", n)),
     }
 }
 
@@ -110,7 +110,7 @@ pub async fn translate_c_directory_to_rust_project(
 
 pub async fn run_all_benchmarks(
     program_dirs: &[PathBuf],
-    output_dir: &PathBuf,
+    output_dir: &Path,
     config_overrides: &[String],
 ) -> HarvestResult<Vec<ProgramEvalStats>> {
     // Process all examples
@@ -133,7 +133,7 @@ pub async fn run_all_benchmarks(
 /// Run all benchmarks for a single program
 async fn benchmark_single_program(
     program_dir: &PathBuf,
-    output_root_dir: &PathBuf,
+    output_root_dir: &Path,
     config_overrides: &[String],
 ) -> ProgramEvalStats {
     let program_name = program_dir
@@ -183,7 +183,7 @@ async fn benchmark_single_program(
     };
 
     // Log test case parsing success
-    if test_cases.len() > 0 {
+    if !test_cases.is_empty() {
         println!("✅ Successfully parsed {} test case(s)", test_cases.len());
     }
 
@@ -193,6 +193,7 @@ async fn benchmark_single_program(
             .await;
 
     result.translation_success = translation_result.translation_success;
+    result.rust_build_success = translation_result.build_success;
 
     if translation_result.translation_success {
         println!("✅ Translation completed successfully!");

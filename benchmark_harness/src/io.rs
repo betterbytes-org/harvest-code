@@ -1,6 +1,6 @@
 use crate::error::HarvestResult;
 use crate::stats::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Write CSV results to file
 pub fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> HarvestResult<()> {
@@ -34,7 +34,7 @@ pub fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> H
     Ok(())
 }
 
-pub fn validate_input_directory(input_dir: &PathBuf) -> HarvestResult<()> {
+pub fn validate_input_directory(input_dir: &Path) -> HarvestResult<()> {
     if !input_dir.exists() || !input_dir.is_dir() {
         return Err(format!(
             "Input directory does not exist or is not a directory: {}",

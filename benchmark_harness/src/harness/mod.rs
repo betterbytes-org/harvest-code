@@ -12,24 +12,15 @@ use std::process::Command;
 use std::time::Duration;
 
 /// Represents the expected stdout pattern in a test case
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct StdoutPattern {
     pub pattern: String,
     #[serde(default)]
     pub is_regex: bool,
 }
 
-impl Default for StdoutPattern {
-    fn default() -> Self {
-        Self {
-            pattern: String::new(),
-            is_regex: false,
-        }
-    }
-}
-
 /// Represents a test case with command arguments, input, and expected output
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct TestCase {
     #[serde(default)]
     pub argv: Vec<String>,
@@ -45,19 +36,6 @@ pub struct TestCase {
     pub filename: String,
 }
 
-impl Default for TestCase {
-    fn default() -> Self {
-        Self {
-            argv: Vec::new(),
-            stdin: None,
-            stdout: StdoutPattern::default(),
-            rc: None,
-            has_ub: None,
-            filename: String::new(),
-        }
-    }
-}
-
 /// Parses a JSON string into a TestCase struct
 pub fn parse_test_case_json(json_str: &str) -> HarvestResult<TestCase> {
     let mut test_case: TestCase = serde_json::from_str(json_str)
@@ -71,7 +49,7 @@ pub fn parse_test_case_json(json_str: &str) -> HarvestResult<TestCase> {
 
 /// Validate that required benchmark subdirectories exist
 /// Returns paths to (input/test_case/src, input/test_vectors)
-pub fn parse_benchmark_dir(input_dir: &PathBuf) -> HarvestResult<(PathBuf, PathBuf)> {
+pub fn parse_benchmark_dir(input_dir: &Path) -> HarvestResult<(PathBuf, PathBuf)> {
     if !input_dir.exists() {
         return Err(format!("Input directory does not exist: {}", input_dir.display()).into());
     }
@@ -149,7 +127,7 @@ pub fn parse_test_vectors<P: AsRef<Path>>(directory_path: P) -> HarvestResult<Ve
 }
 
 /// Clean up build artifacts from successfully translated Rust projects
-pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &PathBuf) {
+pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &Path) {
     let mut cleaned_count = 0;
     let mut cleanup_errors = Vec::new();
 
@@ -159,8 +137,6 @@ pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &PathBuf) {
 
             // Check if Cargo.toml exists to confirm it's a Rust project
             if project_dir.join("Cargo.toml").exists() {
-                // println!("Cleaning build artifacts for: {}", result.program_name);
-
                 match Command::new("cargo")
                     .arg("clean")
                     .current_dir(&project_dir)
@@ -168,7 +144,6 @@ pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &PathBuf) {
                 {
                     Ok(output) if output.status.success() => {
                         cleaned_count += 1;
-                        // println!("  ✅ Cleaned successfully");
                     }
                     Ok(output) => {
                         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -239,11 +214,6 @@ pub fn validate_binary_output(
     };
 
     if matches {
-        let match_type = if test_case.stdout.is_regex {
-            "regex"
-        } else {
-            "exact"
-        };
         Ok(())
     } else {
         let pattern_type = if test_case.stdout.is_regex {

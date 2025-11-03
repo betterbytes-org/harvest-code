@@ -1,7 +1,7 @@
 use crate::error::HarvestResult;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-pub fn log_found_programs(program_dirs: &[PathBuf], input_dir: &PathBuf) -> HarvestResult<()> {
+pub fn log_found_programs(program_dirs: &[PathBuf], input_dir: &Path) -> HarvestResult<()> {
     if program_dirs.is_empty() {
         println!("No program directories found in: {}", input_dir.display());
         return Ok(());
