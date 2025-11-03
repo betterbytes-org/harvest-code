@@ -2,12 +2,14 @@ mod cli;
 mod error;
 mod harness;
 mod io;
+mod logger;
 mod runner;
 mod stats;
 use crate::cli::*;
 use crate::error::HarvestResult;
 use crate::harness::*;
 use crate::io::*;
+use crate::logger::TeeLogger;
 use crate::stats::*;
 use clap::Parser;
 use harvest_ir::fs::RawDir;
@@ -15,6 +17,7 @@ use harvest_ir::HarvestIR;
 use harvest_ir::Representation;
 use harvest_translate::cli::initialize;
 use harvest_translate::transpile;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -307,6 +310,9 @@ async fn main() -> HarvestResult<()> {
 
     // Create output directory if it doesn't exist
     ensure_output_directory(&args.output_dir)?;
+
+    let log_file = File::create(args.output_dir.join("output.log"))?;
+    TeeLogger::init(log::LevelFilter::Info, log_file)?;
     run(args).await
 }
 
