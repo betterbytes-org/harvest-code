@@ -4,6 +4,23 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+pub fn log_found_programs(program_dirs: &[PathBuf], input_dir: &Path) -> HarvestResult<()> {
+    if program_dirs.is_empty() {
+        println!("No program directories found in: {}", input_dir.display());
+        return Ok(());
+    }
+
+    println!(
+        "\nFound {} program directories to process:",
+        program_dirs.len()
+    );
+    for dir in program_dirs {
+        println!("  - {}", dir.file_name().unwrap().to_string_lossy());
+    }
+
+    Ok(())
+}
+
 /// Write CSV results to file
 pub fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> HarvestResult<()> {
     let mut wtr = csv::Writer::from_path(file_path)?;
