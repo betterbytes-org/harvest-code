@@ -20,4 +20,8 @@ pub struct Args {
     /// Set a configuration value; format $NAME=$VALUE.
     #[arg(long, short)]
     pub config: Vec<String>,
+
+    /// Timeout in seconds for running test cases
+    #[arg(long, default_value = "10")]
+    pub timeout: u64,
 }

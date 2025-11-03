@@ -111,6 +111,7 @@ pub async fn run_all_benchmarks(
     program_dirs: &[PathBuf],
     output_dir: &Path,
     config_overrides: &[String],
+    timeout: u64,
 ) -> HarvestResult<Vec<ProgramEvalStats>> {
     // Process all examples
     let mut results = Vec::new();
@@ -121,7 +122,8 @@ pub async fn run_all_benchmarks(
         log::info!("Processing example {} of {}", i + 1, total_examples);
         log::info!("{}", "=".repeat(80));
 
-        let result = benchmark_single_program(program_dir, output_dir, config_overrides).await;
+        let result =
+            benchmark_single_program(program_dir, output_dir, config_overrides, timeout).await;
 
         results.push(result);
     }
@@ -134,6 +136,7 @@ async fn benchmark_single_program(
     program_dir: &PathBuf,
     output_root_dir: &Path,
     config_overrides: &[String],
+    timeout: u64,
 ) -> ProgramEvalStats {
     let program_name = program_dir
         .file_name()
@@ -141,13 +144,12 @@ async fn benchmark_single_program(
         .to_string_lossy()
         .to_string();
 
-    // TODO: switch to implementation that doesn't need mutable variable
     let mut result = ProgramEvalStats {
         program_name: program_name.clone(),
-        translation_success: false, // TODO: Actually attempt translation
-        rust_build_success: false,  // TODO: Actually attempt build
-        total_tests: 0,             // TODO: Count actual tests
-        passed_tests: 0,            // TODO: Run actual tests
+        translation_success: false,
+        rust_build_success: false,
+        total_tests: 0,
+        passed_tests: 0,
         error_message: None,
         test_results: Vec::new(),
     };
@@ -241,9 +243,8 @@ async fn benchmark_single_program(
             test_case.argv,
             test_case.stdin,
         );
-        // TODO: make timeout configurable
-        let timeout = Some(10);
-        match validate_binary_output(&translation_result.rust_binary_path, test_case, timeout) {
+        let timeout_opt = Some(timeout);
+        match validate_binary_output(&translation_result.rust_binary_path, test_case, timeout_opt) {
             Ok(()) => {
                 result.passed_tests += 1;
                 result.test_results.push(TestResult {
@@ -326,7 +327,8 @@ async fn run(args: Args) -> HarvestResult<()> {
     log_found_programs(&program_dirs, &args.input_dir)?;
 
     // Process all programs
-    let results = run_all_benchmarks(&program_dirs, &args.output_dir, &args.config).await?;
+    let results =
+        run_all_benchmarks(&program_dirs, &args.output_dir, &args.config, args.timeout).await?;
     let csv_output_path = args.output_dir.join("results.csv");
     write_csv_results(&csv_output_path, &results)?;
 
