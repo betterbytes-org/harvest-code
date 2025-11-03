@@ -1,5 +1,5 @@
 /// A simple logger that tees to stdout and a file
-use log::{set_boxed_logger, LevelFilter, Log, Metadata, Record, SetLoggerError};
+use log::{set_boxed_logger, set_max_level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use std::fs::File;
 use std::io::{stdout, Write};
 use std::sync::Mutex;
@@ -12,9 +12,9 @@ pub struct TeeLogger {
 }
 
 impl TeeLogger {
-    /// Globally initializes the TeeLogger as the one and only used logger.
+    /// Globally initializes the TeeLogger as the one and only logger.
     pub fn init(log_level: LevelFilter, file: File) -> Result<(), SetLoggerError> {
-        // set_max_level(log_level);
+        set_max_level(log_level);
         set_boxed_logger(TeeLogger::new(log_level, file))
     }
 
@@ -27,9 +27,10 @@ impl TeeLogger {
 }
 
 impl Log for TeeLogger {
-    fn enabled(&self, _metadata: &Metadata<'_>) -> bool {
-        true
-        // metadata.level() <= self.level
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        // Only log messages from this crate and its modules
+        let target = metadata.target();
+        target.starts_with("benchmark")
     }
 
     fn log(&self, record: &Record<'_>) {
@@ -39,15 +40,12 @@ impl Log for TeeLogger {
             let mut file_lock = self.file.lock().unwrap();
             writeln!(stdout_lock, "{}", record.args()).unwrap();
             writeln!(file_lock, "{}", record.args()).unwrap();
-
-            self.flush();
         }
     }
 
     fn flush(&self) {
         use std::io::Write;
         let _ = stdout().flush();
-        // let _ = self.file.flush();
         let _ = self.file.lock().unwrap().flush();
     }
 }

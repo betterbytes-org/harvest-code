@@ -164,7 +164,7 @@ pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &Path) {
                         let error_msg =
                             format!("Failed to clean {}: {}", result.program_name, stderr);
                         cleanup_errors.push(error_msg.clone());
-                        println!("  ❌ {}", error_msg);
+                        log::info!("  ❌ {}", error_msg);
                     }
                     Err(e) => {
                         let error_msg = format!(
@@ -172,25 +172,25 @@ pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &Path) {
                             result.program_name, e
                         );
                         cleanup_errors.push(error_msg.clone());
-                        println!("  ❌ {}", error_msg);
+                        log::info!("  ❌ {}", error_msg);
                     }
                 }
             } else {
-                println!("Skipping {}: No Cargo.toml found", result.program_name);
+                log::info!("Skipping {}: No Cargo.toml found", result.program_name);
             }
         }
     }
 
-    println!("\nCleanup Summary:");
-    println!("  Successfully cleaned: {} projects", cleaned_count);
+    log::info!("\nCleanup Summary:");
+    log::info!("  Successfully cleaned: {} projects", cleaned_count);
     if !cleanup_errors.is_empty() {
-        println!("  Cleanup errors: {} projects", cleanup_errors.len());
+        log::info!("  Cleanup errors: {} projects", cleanup_errors.len());
         for error in &cleanup_errors {
-            println!("    - {}", error);
+            log::info!("    - {}", error);
         }
     }
 
-    println!("\nDone!");
+    log::info!("\nDone!");
 }
 
 /// Runs a binary with test case inputs and compares its output against expected values.

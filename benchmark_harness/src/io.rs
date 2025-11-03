@@ -6,16 +6,16 @@ use std::path::{Path, PathBuf};
 
 pub fn log_found_programs(program_dirs: &[PathBuf], input_dir: &Path) -> HarvestResult<()> {
     if program_dirs.is_empty() {
-        println!("No program directories found in: {}", input_dir.display());
+        log::info!("No program directories found in: {}", input_dir.display());
         return Ok(());
     }
 
-    println!(
+    log::info!(
         "\nFound {} program directories to process:",
         program_dirs.len()
     );
     for dir in program_dirs {
-        println!("  - {}", dir.file_name().unwrap().to_string_lossy());
+        log::info!("  - {}", dir.file_name().unwrap().to_string_lossy());
     }
 
     Ok(())
@@ -96,31 +96,31 @@ pub fn collect_program_dirs(input_dir: &PathBuf) -> HarvestResult<Vec<PathBuf>> 
 
 pub fn log_summary_stats(summary: &SummaryStats) {
     // Print final summary
-    println!("\n{}", "=".repeat(80));
-    println!("FINAL SUMMARY - All Benchmark Processing Complete!");
-    println!("{}", "=".repeat(80));
+    log::info!("\n{}", "=".repeat(80));
+    log::info!("FINAL SUMMARY - All Benchmark Processing Complete!");
+    log::info!("{}", "=".repeat(80));
 
-    println!("\nSummary Statistics:");
-    println!("  Total programs processed: {}", summary.num_programs);
-    println!(
+    log::info!("\nSummary Statistics:");
+    log::info!("  Total programs processed: {}", summary.num_programs);
+    log::info!(
         "  Successful translations: {} ({:.1}%)",
         summary.successful_translations,
         summary.translation_success_rate()
     );
-    println!(
+    log::info!(
         "  Successful Rust builds: {} ({:.1}%)",
         summary.successful_rust_builds,
         summary.rust_build_success_rate()
     );
 
-    println!("\nTest Results:");
-    println!("  Total test cases: {}", summary.total_tests);
-    println!("  Passed: {} ✅", summary.total_passed_tests);
-    println!(
+    log::info!("\nTest Results:");
+    log::info!("  Total test cases: {}", summary.total_tests);
+    log::info!("  Passed: {} ✅", summary.total_passed_tests);
+    log::info!(
         "  Failed: {} ❌",
         summary.total_tests - summary.total_passed_tests
     );
-    println!(
+    log::info!(
         "  Overall success rate: {:.1}%",
         summary.overall_success_rate()
     );
@@ -134,17 +134,17 @@ pub fn log_failing_programs(results: &[ProgramEvalStats]) {
         .collect();
 
     if !failed_examples.is_empty() {
-        println!("\n⚠️  Examples with issues:");
+        log::info!("\n⚠️  Examples with issues:");
         for example in failed_examples {
-            println!("  - {}: ", example.program_name);
+            log::info!("  - {}: ", example.program_name);
             if !example.translation_success {
-                println!("    ❌ Translation failed");
+                log::info!("    ❌ Translation failed");
             }
             if !example.rust_build_success {
-                println!("    ❌ Rust build failed");
+                log::info!("    ❌ Rust build failed");
             }
             if example.success_rate() < 100.0 && example.total_tests > 0 {
-                println!(
+                log::info!(
                     "    ⚠️  Tests: {}/{} passed ({:.1}%)",
                     example.passed_tests,
                     example.total_tests,

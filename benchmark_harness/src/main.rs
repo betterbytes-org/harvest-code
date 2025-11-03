@@ -107,8 +107,6 @@ pub async fn translate_c_directory_to_rust_project(
     }
 }
 
-// TODO: switch println! to proper logging
-
 pub async fn run_all_benchmarks(
     program_dirs: &[PathBuf],
     output_dir: &Path,
@@ -119,9 +117,9 @@ pub async fn run_all_benchmarks(
     let total_examples = program_dirs.len();
 
     for (i, program_dir) in program_dirs.iter().enumerate() {
-        println!("\n{}", "=".repeat(80));
-        println!("Processing example {} of {}", i + 1, total_examples);
-        println!("{}", "=".repeat(80));
+        log::error!("\n{}", "=".repeat(80));
+        log::info!("Processing example {} of {}", i + 1, total_examples);
+        log::info!("{}", "=".repeat(80));
 
         let result = benchmark_single_program(program_dir, output_dir, config_overrides).await;
 
@@ -156,12 +154,12 @@ async fn benchmark_single_program(
 
     let mut error_messages = Vec::new();
 
-    println!("Translating program: {}", program_name);
-    println!("Input directory: {}", program_dir.display());
+    log::info!("Translating program: {}", program_name);
+    log::info!("Input directory: {}", program_dir.display());
 
     // get program output directory
     let output_dir = output_root_dir.join(&program_name);
-    println!("Output directory: {}", output_dir.display());
+    log::info!("Output directory: {}", output_dir.display());
 
     // Check for required subdirectories & log error if we don't find them
     let (test_case_src_dir, test_vectors_dir) = match parse_benchmark_dir(program_dir) {
@@ -187,7 +185,7 @@ async fn benchmark_single_program(
 
     // Log test case parsing success
     if !test_cases.is_empty() {
-        println!("✅ Successfully parsed {} test case(s)", test_cases.len());
+        log::info!("✅ Successfully parsed {} test case(s)", test_cases.len());
     }
 
     // Do the actual translation
@@ -199,7 +197,7 @@ async fn benchmark_single_program(
     result.rust_build_success = translation_result.build_success;
 
     if translation_result.translation_success {
-        println!("✅ Translation completed successfully!");
+        log::info!("✅ Translation completed successfully!");
     } else {
         let error = format!(
             "Failed to translate C project: {:?}",
@@ -207,12 +205,12 @@ async fn benchmark_single_program(
         );
         result.error_message = Some(error.clone());
         error_messages.push(error);
-        println!("❌ Translation failed");
+        log::info!("❌ Translation failed");
         return result;
     }
 
     if translation_result.build_success {
-        println!("✅ Rust build completed successfully!");
+        log::info!("✅ Rust build completed successfully!");
     } else {
         let error = format!(
             "Failed to build Rust project: {:?}",
@@ -220,27 +218,28 @@ async fn benchmark_single_program(
         );
         result.error_message = Some(error.clone());
         error_messages.push(error);
-        println!("❌ Rust build failed");
+        log::info!("❌ Rust build failed");
         return result;
     }
 
     assert!(translation_result.rust_binary_path.exists());
 
     // Step 5: run program against test cases
-    println!("Validating Rust binary outputs against test cases...");
+    log::info!("Validating Rust binary outputs against test cases...");
 
     // Run validation tests
     for (i, test_case) in test_cases.iter().enumerate() {
-        println!(
+        log::info!(
             "Running test case {} ({} of {})...",
             test_case.filename,
             i + 1,
             test_cases.len()
         );
 
-        println!(
+        log::info!(
             "Validating output for test case with args: {:?} stdin: {:?}",
-            test_case.argv, test_case.stdin,
+            test_case.argv,
+            test_case.stdin,
         );
         // TODO: make timeout configurable
         let timeout = Some(10);
@@ -251,7 +250,7 @@ async fn benchmark_single_program(
                     filename: test_case.filename.clone(),
                     passed: true,
                 });
-                println!("✅ Test case {} passed", test_case.filename);
+                log::info!("✅ Test case {} passed", test_case.filename);
             }
             Err(e) => {
                 result.test_results.push(TestResult {
@@ -260,14 +259,14 @@ async fn benchmark_single_program(
                 });
                 let error = format!("Test case {} failed: {}", test_case.filename, e);
                 error_messages.push(error);
-                println!("❌ Test case {} failed: {}", test_case.filename, e);
+                log::info!("❌ Test case {} failed: {}", test_case.filename, e);
             }
         }
     }
 
     // Print summary for this example
-    println!("\nResults for {}:", program_name);
-    println!(
+    log::info!("\nResults for {}:", program_name);
+    log::info!(
         "  Translation: {}",
         if result.translation_success {
             "✅"
@@ -275,7 +274,7 @@ async fn benchmark_single_program(
             "❌"
         }
     );
-    println!(
+    log::info!(
         "  Rust Build: {}",
         if result.rust_build_success {
             "✅"
@@ -283,7 +282,7 @@ async fn benchmark_single_program(
             "❌"
         }
     );
-    println!(
+    log::info!(
         "  Tests: {}/{} passed ({:.1}%)",
         result.passed_tests,
         result.total_tests,
@@ -294,7 +293,7 @@ async fn benchmark_single_program(
     if !error_messages.is_empty() {
         let error_file_path = output_dir.join("results.err");
         if let Err(e) = write_error_file(&error_file_path, &error_messages) {
-            println!("Warning: Failed to write error file: {}", e);
+            log::info!("Warning: Failed to write error file: {}", e);
         }
     }
 
@@ -317,9 +316,9 @@ async fn main() -> HarvestResult<()> {
 }
 
 async fn run(args: Args) -> HarvestResult<()> {
-    println!("Running Benchmarks");
-    println!("Input directory: {}", args.input_dir.display());
-    println!("Output directory: {}", args.output_dir.display());
+    log::info!("Running Benchmarks");
+    log::info!("Input directory: {}", args.input_dir.display());
+    log::info!("Output directory: {}", args.output_dir.display());
 
     // Get the programs to evaluate
     // Should be in directories that are immediate children of input_dir
@@ -334,15 +333,15 @@ async fn run(args: Args) -> HarvestResult<()> {
     let summary_stats = SummaryStats::from_results(&results);
     log_summary_stats(&summary_stats);
 
-    println!("\nOutput Files:");
-    println!("  Translated projects: {}", args.output_dir.display());
-    println!("  CSV results: {}", csv_output_path.display());
-    println!("  Error logs: results.err files in each translated project directory");
+    log::info!("\nOutput Files:");
+    log::info!("  Translated projects: {}", args.output_dir.display());
+    log::info!("  CSV results: {}", csv_output_path.display());
+    log::info!("  Error logs: results.err files in each translated project directory");
 
     // Print examples with issues
     log_failing_programs(&results);
 
-    println!("\nProcessing complete! Check the CSV file and individual project directories for detailed results.");
+    log::info!("\nProcessing complete! Check the CSV file and individual project directories for detailed results.");
 
     cleanup_benchmarks(&results, &args.output_dir);
 
