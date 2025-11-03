@@ -1,5 +1,7 @@
 use crate::error::HarvestResult;
 use crate::stats::*;
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Write CSV results to file
@@ -134,4 +136,13 @@ pub fn log_failing_programs(results: &[ProgramEvalStats]) {
             }
         }
     }
+}
+
+/// Write error messages to a file
+pub fn write_error_file(file_path: &PathBuf, error_messages: &[String]) -> HarvestResult<()> {
+    let mut file = File::create(file_path)?;
+    for error in error_messages {
+        writeln!(file, "{}", error)?;
+    }
+    Ok(())
 }

@@ -182,6 +182,8 @@ async fn benchmark_single_program(
         }
     };
 
+    result.total_tests = test_cases.len();
+
     // Log test case parsing success
     if !test_cases.is_empty() {
         println!("✅ Successfully parsed {} test case(s)", test_cases.len());
@@ -208,10 +210,23 @@ async fn benchmark_single_program(
         return result;
     }
 
-    // Step 5: run program against test cases
-    println!("Validating Rust binary outputs against test cases...");
+    if translation_result.build_success {
+        println!("✅ Rust build completed successfully!");
+    } else {
+        let error = format!(
+            "Failed to build Rust project: {:?}",
+            translation_result.build_error
+        );
+        result.error_message = Some(error.clone());
+        error_messages.push(error);
+        println!("❌ Rust build failed");
+        return result;
+    }
 
     assert!(translation_result.rust_binary_path.exists());
+
+    // Step 5: run program against test cases
+    println!("Validating Rust binary outputs against test cases...");
 
     // Run validation tests
     for (i, test_case) in test_cases.iter().enumerate() {
@@ -274,6 +289,14 @@ async fn benchmark_single_program(
         result.success_rate()
     );
 
+    // Write error messages to results.err file in the output directory if it was created
+    if !error_messages.is_empty() {
+        let error_file_path = output_dir.join("results.err");
+        if let Err(e) = write_error_file(&error_file_path, &error_messages) {
+            println!("Warning: Failed to write error file: {}", e);
+        }
+    }
+
     result
 }
 
@@ -308,11 +331,8 @@ async fn run(args: Args) -> HarvestResult<()> {
     log_summary_stats(&summary_stats);
 
     println!("\nOutput Files:");
-    println!(
-        "  CSV results (original format): {}",
-        csv_output_path.display()
-    );
     println!("  Translated projects: {}", args.output_dir.display());
+    println!("  CSV results: {}", csv_output_path.display());
     println!("  Error logs: results.err files in each translated project directory");
 
     // Print examples with issues
