@@ -1,5 +1,7 @@
+use clap::Parser;
+use harvest_translate::cli::{self, Args};
 use harvest_translate::transpile;
-use harvest_translate::{cli, runner};
+use std::sync::Arc;
 
 fn main() {
     if let Err(e) = run() {
@@ -10,7 +12,8 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-    let Some(config) = cli::initialize() else {
+    let args: Arc<_> = Args::parse().into();
+    let Some(config) = cli::initialize(args) else {
         return Ok(()); // An early-exit argument was passed.
     };
     let ir = transpile(config)?;

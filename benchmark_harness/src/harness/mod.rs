@@ -1,3 +1,4 @@
+use crate::stats::ProgramEvalStats;
 use crate::HarvestResult;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -5,6 +6,7 @@ use std::fs;
 /// for example, parsing code for benchmark-specific configs.
 /// Currently, that is just the MITLL tractor benchmarks.
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// Represents the expected stdout pattern in a test case
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -141,4 +143,60 @@ pub fn parse_test_vectors<P: AsRef<Path>>(directory_path: P) -> HarvestResult<Ve
         }
     }
     Ok(test_cases)
+}
+
+/// Clean up build artifacts from successfully translated Rust projects
+pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &PathBuf) {
+    let mut cleaned_count = 0;
+    let mut cleanup_errors = Vec::new();
+
+    for result in results {
+        if result.translation_success {
+            let project_dir = output_dir.join(&result.program_name);
+
+            // Check if Cargo.toml exists to confirm it's a Rust project
+            if project_dir.join("Cargo.toml").exists() {
+                // println!("Cleaning build artifacts for: {}", result.program_name);
+
+                match Command::new("cargo")
+                    .arg("clean")
+                    .current_dir(&project_dir)
+                    .output()
+                {
+                    Ok(output) if output.status.success() => {
+                        cleaned_count += 1;
+                        // println!("  ✅ Cleaned successfully");
+                    }
+                    Ok(output) => {
+                        let stderr = String::from_utf8_lossy(&output.stderr);
+                        let error_msg =
+                            format!("Failed to clean {}: {}", result.program_name, stderr);
+                        cleanup_errors.push(error_msg.clone());
+                        println!("  ❌ {}", error_msg);
+                    }
+                    Err(e) => {
+                        let error_msg = format!(
+                            "Failed to execute cargo clean for {}: {}",
+                            result.program_name, e
+                        );
+                        cleanup_errors.push(error_msg.clone());
+                        println!("  ❌ {}", error_msg);
+                    }
+                }
+            } else {
+                println!("Skipping {}: No Cargo.toml found", result.program_name);
+            }
+        }
+    }
+
+    println!("\nCleanup Summary:");
+    println!("  Successfully cleaned: {} projects", cleaned_count);
+    if !cleanup_errors.is_empty() {
+        println!("  Cleanup errors: {} projects", cleanup_errors.len());
+        for error in &cleanup_errors {
+            println!("    - {}", error);
+        }
+    }
+
+    println!("\nAll processing and cleanup complete!");
 }

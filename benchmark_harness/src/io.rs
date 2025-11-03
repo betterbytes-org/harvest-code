@@ -4,7 +4,7 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 /// Write CSV results to file
-fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> HarvestResult<()> {
+pub fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> HarvestResult<()> {
     let mut wtr = csv::Writer::from_path(file_path)?;
 
     // Write header
@@ -76,15 +76,63 @@ pub fn collect_program_dirs(input_dir: &PathBuf) -> HarvestResult<Vec<PathBuf>> 
     Ok(program_dirs)
 }
 
-// /// Validates that a path exists and is a directory
-// fn validate_directory_path(dir_path: &Path) -> HarvestResult<()> {
-//     if !dir_path.exists() {
-//         return Err(format!("Directory does not exist: {}", dir_path.display()).into());
-//     }
+pub fn log_summary_stats(summary: &SummaryStats) {
+    // Print final summary
+    println!("\n{}", "=".repeat(80));
+    println!("FINAL SUMMARY - All Benchmark Processing Complete!");
+    println!("{}", "=".repeat(80));
 
-//     if !dir_path.is_dir() {
-//         return Err(format!("Path is not a directory: {}", dir_path.display()).into());
-//     }
+    println!("\nSummary Statistics:");
+    println!("  Total programs processed: {}", summary.num_programs);
+    println!(
+        "  Successful translations: {} ({:.1}%)",
+        summary.successful_translations,
+        summary.translation_success_rate()
+    );
+    println!(
+        "  Successful Rust builds: {} ({:.1}%)",
+        summary.successful_rust_builds,
+        summary.rust_build_success_rate()
+    );
 
-//     Ok(())
-// }
+    println!("\nTest Results:");
+    println!("  Total test cases: {}", summary.total_tests);
+    println!("  Passed: {} ✅", summary.total_passed_tests);
+    println!(
+        "  Failed: {} ❌",
+        summary.total_tests - summary.total_passed_tests
+    );
+    println!(
+        "  Overall success rate: {:.1}%",
+        summary.overall_success_rate()
+    );
+}
+
+/// Log programs that have issues (translation failures, build failures, or test failures)
+pub fn log_failing_programs(results: &[ProgramEvalStats]) {
+    let failed_examples: Vec<_> = results
+        .iter()
+        .filter(|r| !r.translation_success || !r.rust_build_success || r.success_rate() < 100.0)
+        .collect();
+
+    if !failed_examples.is_empty() {
+        println!("\n⚠️  Examples with issues:");
+        for example in failed_examples {
+            println!("  - {}: ", example.program_name);
+            if !example.translation_success {
+                println!("    ❌ Translation failed");
+            }
+            if !example.rust_build_success {
+                println!("    ❌ Rust build failed");
+            }
+            if example.success_rate() < 100.0 && example.total_tests > 0 {
+                println!(
+                    "    ⚠️  Tests: {}/{} passed ({:.1}%)",
+                    example.passed_tests,
+                    example.total_tests,
+                    example.success_rate()
+                );
+            }
+        }
+    }
+}

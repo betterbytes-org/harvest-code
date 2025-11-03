@@ -11,13 +11,26 @@ use crate::io::*;
 use crate::logging::*;
 use crate::stats::*;
 use clap::Parser;
+use harvest_ir::HarvestIR;
+use harvest_translate::cli::initialize;
+use harvest_translate::transpile;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 pub async fn translate_c_directory_to_rust_project(
     input_dir: &Path,
     output_dir: &Path,
-) -> HarvestResult<()> {
-    unimplemented!()
+    config_overrides: &[String],
+) -> HarvestResult<Arc<HarvestIR>> {
+    let args: Arc<harvest_translate::cli::Args> = harvest_translate::cli::Args {
+        input: Some(input_dir.to_path_buf()),
+        output: Some(output_dir.to_path_buf()),
+        print_config_path: false,
+        config: config_overrides.to_vec(),
+    }
+    .into();
+    let config = initialize(args).expect("Failed to generate config");
+    transpile(config)
 }
 
 // TODO: switch println! to proper logging
@@ -25,6 +38,7 @@ pub async fn translate_c_directory_to_rust_project(
 pub async fn run_all_benchmarks(
     program_dirs: &[PathBuf],
     output_dir: &PathBuf,
+    config_overrides: &[String],
 ) -> HarvestResult<Vec<ProgramEvalStats>> {
     // Process all examples
     let mut results = Vec::new();
@@ -35,7 +49,7 @@ pub async fn run_all_benchmarks(
         println!("Processing example {} of {}", i + 1, total_examples);
         println!("{}", "=".repeat(80));
 
-        let result = benchmark_single_program(program_dir, output_dir).await;
+        let result = benchmark_single_program(program_dir, output_dir, config_overrides).await;
 
         results.push(result);
     }
@@ -47,6 +61,7 @@ pub async fn run_all_benchmarks(
 async fn benchmark_single_program(
     program_dir: &PathBuf,
     output_root_dir: &PathBuf,
+    config_overrides: &[String],
 ) -> ProgramEvalStats {
     let program_name = program_dir
         .file_name()
@@ -100,37 +115,27 @@ async fn benchmark_single_program(
     }
 
     // Do the actual translation
-    let translation_success =
-        match translate_c_directory_to_rust_project(&test_case_src_dir, &output_dir).await {
-            Ok(()) => {
-                result.translation_success = true;
-                println!("✅ Translation completed successfully!");
-            }
-            Err(e) => {
-                let error = format!("Failed to translate C project: {}", e);
-                result.error_message = Some(error.clone());
-                error_messages.push(error);
-                println!("❌ Translation failed");
-            }
-        };
-
-    // Validate that the Rust project builds
-    // if translation_success {
-    //     println!("Validating that the Rust project builds...");
-    //     match validate_rust_project_builds(&output_dir) {
-    //         Ok(()) => {
-    //             result.rust_build_success = true;
-    //             log_or_print!(logger.as_ref(), "✅ Rust project builds successfully!");
-    //         }
-    //         Err(e) => {
-    //             let error = format!("Rust project failed to build: {}", e);
-    //             error_messages.push(error);
-    //             log_or_print!(logger.as_ref(), "❌ Rust build failed");
-    //         }
-    //     }
-    // }
+    let translation_success = match translate_c_directory_to_rust_project(
+        &test_case_src_dir,
+        &output_dir,
+        config_overrides,
+    )
+    .await
+    {
+        Ok(_) => {
+            result.translation_success = true;
+            println!("✅ Translation completed successfully!");
+        }
+        Err(e) => {
+            let error = format!("Failed to translate C project: {}", e);
+            result.error_message = Some(error.clone());
+            error_messages.push(error);
+            println!("❌ Translation failed");
+        }
+    };
 
     unimplemented!()
+    // Step 5: run program against test cases
 
     // TODO: Implement actual translation logic using harvest_translate
     // TODO: Implement actual testing logic
@@ -160,22 +165,27 @@ async fn run(args: Args) -> HarvestResult<()> {
     log_found_programs(&program_dirs, &args.input_dir)?;
 
     // Process all programs
-    let results = run_all_benchmarks(&program_dirs, &args.output_dir).await?;
+    let results = run_all_benchmarks(&program_dirs, &args.output_dir, &args.config).await?;
+    let csv_output_path = args.output_dir.join("results.csv");
+    write_csv_results(&csv_output_path, &results)?;
 
     let summary_stats = SummaryStats::from_results(&results);
+    log_summary_stats(&summary_stats);
 
-    unimplemented!();
-    // // TODO: Generate summary statistics and write results to CSV
-    // println!("\nProcessed {} programs", results.len());
-    // for result in &results {
-    //     println!("  {}: Translation: {}, Build: {}, Tests: {}/{}",
-    //         result.program_name,
-    //         result.translation_success,
-    //         result.rust_build_success,
-    //         result.passed_tests,
-    //         result.total_tests
-    //     );
-    // }
+    println!("\nOutput Files:");
+    println!(
+        "  CSV results (original format): {}",
+        csv_output_path.display()
+    );
+    println!("  Translated projects: {}", args.output_dir.display());
+    println!("  Error logs: results.err files in each translated project directory");
+
+    // Print examples with issues
+    log_failing_programs(&results);
+
+    println!("\nProcessing complete! Check the CSV file and individual project directories for detailed results.");
+
+    cleanup_benchmarks(&results, &args.output_dir);
 
     Ok(())
 }

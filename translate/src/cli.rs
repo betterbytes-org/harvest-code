@@ -70,8 +70,7 @@ pub fn unknown_field_warning(prefix: &str, unknown: &HashMap<String, Value>) {
 ///
 /// Returns the config, or None if a command line flag that calls for an early exit (such as --print_config_path)
 /// was provided.
-pub fn initialize() -> Option<Arc<Config>> {
-    let args: Arc<_> = Args::parse().into();
+pub fn initialize(args: Arc<Args>) -> Option<Arc<Config>> {
     let dirs = ProjectDirs::from("", "", "harvest").expect("no home directory");
     if args.print_config_path {
         println!("Config file location: {:?}", config_file(dirs.config_dir()));
