@@ -4,8 +4,8 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct TestResult {
     // program_name: String,
-    test_filename: String,
-    passed: bool,
+    pub filename: String,
+    pub passed: bool,
 }
 
 /// Statistics for running many tests on a single program

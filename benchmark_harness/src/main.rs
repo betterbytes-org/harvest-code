@@ -3,6 +3,7 @@ mod error;
 mod harness;
 mod io;
 mod logging;
+mod runner;
 mod stats;
 use crate::cli::*;
 use crate::error::HarvestResult;
@@ -11,17 +12,80 @@ use crate::io::*;
 use crate::logging::*;
 use crate::stats::*;
 use clap::Parser;
+use harvest_ir::fs::RawDir;
 use harvest_ir::HarvestIR;
+use harvest_ir::Representation;
 use harvest_translate::cli::initialize;
 use harvest_translate::transpile;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+fn raw_cargo_package(ir: &HarvestIR) -> HarvestResult<&RawDir> {
+    let cargo_packages: Vec<&RawDir> = ir
+        .iter()
+        .filter_map(|(_, repr)| match repr {
+            Representation::CargoPackage(r) => Some(r),
+            _ => None,
+        })
+        .collect();
+
+    match cargo_packages.len() {
+        0 => Err("No CargoPackage representation found in IR".into()),
+        1 => Ok(cargo_packages[0]),
+        n => Err(format!(
+            "Found {} CargoPackage representations, expected at most 1",
+            n
+        )
+        .into()),
+    }
+}
+// Result<Vec<PathBuf>, String>
+fn cargo_build_result(ir: &HarvestIR) -> Result<Vec<PathBuf>, String> {
+    let build_results: Vec<Result<Vec<PathBuf>, String>> = ir
+        .iter()
+        .filter_map(|(_, repr)| match repr {
+            Representation::CargoBuildResult(r) => Some(r.clone()),
+            _ => None,
+        })
+        .collect();
+
+    match build_results.len() {
+        0 => Err("No artifacts built".into()),
+        1 => build_results[0].clone(),
+        n => Err(format!("Found {} build results, expected at most 1", n).into()),
+    }
+}
+
+pub struct TranspilationResult {
+    translation_success: bool,
+    build_success: bool,
+    rust_binary_path: PathBuf,
+    build_error: Option<String>,
+}
+
+impl TranspilationResult {
+    pub fn from_ir(ir: &HarvestIR) -> Self {
+        let translation_success = raw_cargo_package(ir).is_ok();
+        let (build_success, rust_binary_path, build_error) = match cargo_build_result(ir) {
+            Ok(artifacts) => (true, artifacts[0].clone(), None), // should check that there is only 1 artifact
+            Err(err) => (false, PathBuf::new(), Some(err)),
+        };
+
+        Self {
+            translation_success,
+            build_success,
+            rust_binary_path,
+            build_error,
+        }
+    }
+}
+
+// Needs to return path to
 pub async fn translate_c_directory_to_rust_project(
     input_dir: &Path,
     output_dir: &Path,
     config_overrides: &[String],
-) -> HarvestResult<Arc<HarvestIR>> {
+) -> TranspilationResult {
     let args: Arc<harvest_translate::cli::Args> = harvest_translate::cli::Args {
         input: Some(input_dir.to_path_buf()),
         output: Some(output_dir.to_path_buf()),
@@ -30,7 +94,16 @@ pub async fn translate_c_directory_to_rust_project(
     }
     .into();
     let config = initialize(args).expect("Failed to generate config");
-    transpile(config)
+    let ir_result = transpile(config);
+    match ir_result {
+        Ok(ir) => TranspilationResult::from_ir(&ir),
+        Err(_) => TranspilationResult {
+            translation_success: false,
+            build_success: false,
+            rust_binary_path: PathBuf::new(),
+            build_error: Some("Failed to transpile".to_string()),
+        },
+    }
 }
 
 // TODO: switch println! to proper logging
@@ -100,7 +173,7 @@ async fn benchmark_single_program(
     };
 
     // Parse test vectors
-    let test_vectors = match parse_test_vectors(test_vectors_dir) {
+    let test_cases = match parse_test_vectors(test_vectors_dir) {
         Ok(vectors) => vectors,
         Err(e) => {
             result.error_message = Some(e.to_string());
@@ -110,36 +183,97 @@ async fn benchmark_single_program(
     };
 
     // Log test case parsing success
-    if test_vectors.len() > 0 {
-        println!("✅ Successfully parsed {} test case(s)", test_vectors.len());
+    if test_cases.len() > 0 {
+        println!("✅ Successfully parsed {} test case(s)", test_cases.len());
     }
 
     // Do the actual translation
-    let translation_success = match translate_c_directory_to_rust_project(
-        &test_case_src_dir,
-        &output_dir,
-        config_overrides,
-    )
-    .await
-    {
-        Ok(_) => {
-            result.translation_success = true;
-            println!("✅ Translation completed successfully!");
-        }
-        Err(e) => {
-            let error = format!("Failed to translate C project: {}", e);
-            result.error_message = Some(error.clone());
-            error_messages.push(error);
-            println!("❌ Translation failed");
-        }
-    };
+    let translation_result =
+        translate_c_directory_to_rust_project(&test_case_src_dir, &output_dir, config_overrides)
+            .await;
 
-    unimplemented!()
+    result.translation_success = translation_result.translation_success;
+
+    if translation_result.translation_success {
+        println!("✅ Translation completed successfully!");
+    } else {
+        let error = format!(
+            "Failed to translate C project: {:?}",
+            translation_result.build_error
+        );
+        result.error_message = Some(error.clone());
+        error_messages.push(error);
+        println!("❌ Translation failed");
+        return result;
+    }
+
     // Step 5: run program against test cases
+    println!("Validating Rust binary outputs against test cases...");
 
-    // TODO: Implement actual translation logic using harvest_translate
-    // TODO: Implement actual testing logic
-    // For now, return a placeholder result
+    assert!(translation_result.rust_binary_path.exists());
+
+    // Run validation tests
+    for (i, test_case) in test_cases.iter().enumerate() {
+        println!(
+            "Running test case {} ({} of {})...",
+            test_case.filename,
+            i + 1,
+            test_cases.len()
+        );
+
+        println!(
+            "Validating output for test case with args: {:?} stdin: {:?}",
+            test_case.argv, test_case.stdin,
+        );
+        // TODO: make timeout configurable
+        let timeout = Some(10);
+        match validate_binary_output(&translation_result.rust_binary_path, test_case, timeout) {
+            Ok(()) => {
+                result.passed_tests += 1;
+                result.test_results.push(TestResult {
+                    filename: test_case.filename.clone(),
+                    passed: true,
+                });
+                println!("✅ Test case {} passed", test_case.filename);
+            }
+            Err(e) => {
+                result.test_results.push(TestResult {
+                    filename: test_case.filename.clone(),
+                    passed: false,
+                });
+                let error = format!("Test case {} failed: {}", test_case.filename, e);
+                error_messages.push(error);
+                println!("❌ Test case {} failed: {}", test_case.filename, e);
+            }
+        }
+    }
+
+    // Print summary for this example
+    println!("\nResults for {}:", program_name);
+    println!(
+        "  Translation: {}",
+        if result.translation_success {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "  Rust Build: {}",
+        if result.rust_build_success {
+            "✅"
+        } else {
+            "❌"
+        }
+    );
+    println!(
+        "  Tests: {}/{} passed ({:.1}%)",
+        result.passed_tests,
+        result.total_tests,
+        result.success_rate()
+    );
+
+    result
 }
 
 #[tokio::main]

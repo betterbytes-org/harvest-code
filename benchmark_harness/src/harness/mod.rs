@@ -1,5 +1,7 @@
+use crate::runner;
 use crate::stats::ProgramEvalStats;
 use crate::HarvestResult;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 /// This module `harness` is intented to contain code that is specific to a particular set of benchmarks,
@@ -7,6 +9,7 @@ use std::fs;
 /// Currently, that is just the MITLL tractor benchmarks.
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 /// Represents the expected stdout pattern in a test case
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -199,4 +202,61 @@ pub fn cleanup_benchmarks(results: &[ProgramEvalStats], output_dir: &PathBuf) {
     }
 
     println!("\nAll processing and cleanup complete!");
+}
+
+/// Runs a binary with test case inputs and compares its output against expected values.
+///
+/// This function executes the binary with the command line arguments and stdin
+/// from the provided test case, then compares the actual stdout and stderr
+/// against the expected values in the test case.
+pub fn validate_binary_output(
+    binary_path: &Path,
+    test_case: &TestCase,
+    timeout_seconds: Option<u64>,
+) -> HarvestResult<()> {
+    let timeout = Duration::from_secs(timeout_seconds.unwrap_or(10));
+
+    // Run the binary
+    let output = runner::run_binary_with_timeout(binary_path, test_case, timeout)
+        .map_err(|e| format!("Failed to run binary {}: {}", binary_path.display(), e))?;
+
+    let actual_stdout = String::from_utf8_lossy(&output.stdout);
+    let actual_stderr = String::from_utf8_lossy(&output.stderr);
+
+    // Compare stdout against expected pattern
+    let matches = if test_case.stdout.is_regex {
+        // Use regex matching
+        let regex = Regex::new(&test_case.stdout.pattern).map_err(|e| {
+            format!(
+                "Invalid regex pattern '{}': {}",
+                test_case.stdout.pattern, e
+            )
+        })?;
+        regex.is_match(actual_stdout.trim())
+    } else {
+        // Use simple equality matching
+        actual_stdout.trim() == test_case.stdout.pattern.trim()
+    };
+
+    if matches {
+        let match_type = if test_case.stdout.is_regex {
+            "regex"
+        } else {
+            "exact"
+        };
+        Ok(())
+    } else {
+        let pattern_type = if test_case.stdout.is_regex {
+            "regex pattern"
+        } else {
+            "expected stdout"
+        };
+        Err(format!(
+            "❌ Binary produced unexpected output:\n\n{}: {}\n\nActual stdout:\n{}\n\nActual stderr:\n{}",
+            pattern_type.chars().next().unwrap().to_uppercase().collect::<String>() + &pattern_type[1..],
+            test_case.stdout.pattern,
+            actual_stdout,
+            actual_stderr
+        ).into())
+    }
 }

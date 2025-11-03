@@ -1,7 +1,6 @@
 use crate::error::HarvestResult;
 use crate::stats::*;
-use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// Write CSV results to file
 pub fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> HarvestResult<()> {
