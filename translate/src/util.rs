@@ -52,13 +52,26 @@ pub enum EmptyDirError {
     NotWritable,
 }
 
+/// Returns a new temporary directory. Unlike the defaults in the `tempdir` and `tempfile` crates,
+/// this directory is not world-accessible by default.
+#[cfg(not(miri))]
+pub fn tempdir() -> std::io::Result<tempfile::TempDir> {
+    use std::fs::Permissions;
+    let mut builder = tempfile::Builder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(Permissions::from_mode(0o700));
+    }
+    builder.tempdir()
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(not(miri))]
     #[test]
     fn empty_writable_dir_test() {
         use super::*;
-        use crate::test_util::tempdir;
         use std::{fs::File, path::PathBuf};
 
         let tempdir = tempdir().unwrap();

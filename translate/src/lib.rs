@@ -2,6 +2,7 @@
 //! `translate` binary, but is exposed as a library crate as well.
 
 pub mod cli;
+mod diagnostics;
 mod runner;
 mod scheduler;
 pub mod tools;
@@ -24,6 +25,7 @@ use tools::load_raw_source;
 
 /// Performs the complete transpilation process using the scheduler.
 pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std::error::Error>> {
+    let _diagnostics = diagnostics::Collector::new(&config);
     let mut ir_organizer = edit::Organizer::default();
     let mut runner = ToolRunner::default();
     let mut scheduler = Scheduler::default();
