@@ -37,7 +37,8 @@ You will need to have Ollama running to run harvest_translate.
 
 ### Remote OpenAI instance
 
-First, you'll need to provision and [OpenAI API key](https://platform.openai.com/api-keys).
+First, you'll need to provision an [OpenAI API key](https://platform.openai.com/api-keys).
+
 Then, you'll need to set up a custom Harvest config file:
 ```toml 
 [tools.raw_source_to_cargo_llm]
