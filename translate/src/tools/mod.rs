@@ -9,15 +9,15 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-#[derive(Debug, Deserialize)]
-pub struct Config {
-    raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
+#[derive(Default, Debug, Deserialize)]
+pub struct ToolConfigs {
+    pub raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
 
     #[serde(flatten)]
     unknown: HashMap<String, Value>,
 }
 
-impl Config {
+impl ToolConfigs {
     pub fn validate(&self) {
         unknown_field_warning("tools", &self.unknown);
         self.raw_source_to_cargo_llm.validate();
@@ -90,4 +90,7 @@ pub struct RunContext<'a> {
     /// Read access to the IR. This will be the same IR as `might_write` was
     /// most recently called with.
     pub ir_snapshot: Arc<HarvestIR>,
+
+    /// Configuration for the current harvest_translate run.
+    pub config: Arc<crate::cli::Config>,
 }

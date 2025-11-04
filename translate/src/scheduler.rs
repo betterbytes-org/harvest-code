@@ -3,7 +3,7 @@
 //! The scheduler is responsible for determining which tools to invoke and also
 //! for invoking them.
 
-use crate::Tool;
+use crate::tools::Tool;
 use log::debug;
 use std::mem::replace;
 
