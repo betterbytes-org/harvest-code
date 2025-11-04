@@ -14,7 +14,7 @@ use std::{
 
 #[derive(Debug, Deserialize)]
 pub struct ToolConfigs {
-    raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
+    pub raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
 
     #[serde(flatten)]
     unknown: HashMap<String, Value>,

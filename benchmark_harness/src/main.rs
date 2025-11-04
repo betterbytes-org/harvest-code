@@ -59,6 +59,13 @@ pub async fn translate_c_directory_to_rust_project(
     }
     .into();
     let config = initialize(args).expect("Failed to generate config");
+    let tool_config = &config.tools.raw_source_to_cargo_llm;
+    log::info!(
+        "Translating code using {}:{} with max tokens: {}",
+        tool_config.backend,
+        tool_config.model,
+        tool_config.max_tokens
+    );
     let ir_result = transpile(config);
     let raw_c_source = raw_source(&ir_result.as_ref().unwrap()).unwrap();
     raw_c_source

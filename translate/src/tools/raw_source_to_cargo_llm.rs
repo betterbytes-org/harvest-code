@@ -123,13 +123,13 @@ pub struct Config {
     api_key: Option<ApiKey>,
 
     /// Which backend to use, e.g. "ollama".
-    backend: String,
+    pub backend: String,
 
     /// Name of the model to invoke.
-    model: String,
+    pub model: String,
 
     /// Maximum output tokens.
-    max_tokens: u32,
+    pub max_tokens: u32,
 
     #[serde(flatten)]
     unknown: HashMap<String, Value>,
