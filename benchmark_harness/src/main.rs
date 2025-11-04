@@ -2,6 +2,7 @@ mod cli;
 mod error;
 mod harness;
 mod io;
+mod ir_utils;
 mod logger;
 mod runner;
 mod stats;
@@ -9,53 +10,16 @@ use crate::cli::*;
 use crate::error::HarvestResult;
 use crate::harness::*;
 use crate::io::*;
+use crate::ir_utils::{cargo_build_result, raw_cargo_package, raw_source};
 use crate::logger::TeeLogger;
 use crate::stats::*;
 use clap::Parser;
-use harvest_ir::fs::RawDir;
 use harvest_ir::HarvestIR;
-use harvest_ir::Representation;
 use harvest_translate::cli::initialize;
 use harvest_translate::transpile;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-
-fn raw_cargo_package(ir: &HarvestIR) -> HarvestResult<&RawDir> {
-    let cargo_packages: Vec<&RawDir> = ir
-        .iter()
-        .filter_map(|(_, repr)| match repr {
-            Representation::CargoPackage(r) => Some(r),
-            _ => None,
-        })
-        .collect();
-
-    match cargo_packages.len() {
-        0 => Err("No CargoPackage representation found in IR".into()),
-        1 => Ok(cargo_packages[0]),
-        n => Err(format!(
-            "Found {} CargoPackage representations, expected at most 1",
-            n
-        )
-        .into()),
-    }
-}
-// Result<Vec<PathBuf>, String>
-fn cargo_build_result(ir: &HarvestIR) -> Result<Vec<PathBuf>, String> {
-    let build_results: Vec<Result<Vec<PathBuf>, String>> = ir
-        .iter()
-        .filter_map(|(_, repr)| match repr {
-            Representation::CargoBuildResult(r) => Some(r.clone()),
-            _ => None,
-        })
-        .collect();
-
-    match build_results.len() {
-        0 => Err("No artifacts built".into()),
-        1 => build_results[0].clone(),
-        n => Err(format!("Found {} build results, expected at most 1", n)),
-    }
-}
 
 pub struct TranspilationResult {
     translation_success: bool,
@@ -96,6 +60,11 @@ pub async fn translate_c_directory_to_rust_project(
     .into();
     let config = initialize(args).expect("Failed to generate config");
     let ir_result = transpile(config);
+    let raw_c_source = raw_source(&ir_result.as_ref().unwrap()).unwrap();
+    raw_c_source
+        .materialize(&output_dir.join("c_src"))
+        .expect("Failed to materialize C source");
+
     match ir_result {
         Ok(ir) => TranspilationResult::from_ir(&ir),
         Err(_) => TranspilationResult {
