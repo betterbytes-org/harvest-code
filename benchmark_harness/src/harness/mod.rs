@@ -16,6 +16,7 @@ use std::time::Duration;
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct StdoutPattern {
     pub pattern: String,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
     #[serde(default)]
     pub is_regex: bool,
 }
@@ -30,12 +31,49 @@ pub struct TestCase {
     pub stdin: Option<String>,
     #[serde(default)]
     pub stdout: StdoutPattern,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub rc: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub has_ub: Option<String>,
     #[serde(skip)] // Don't serialize/deserialize this field as it's not part of the JSON
     pub filename: String,
+}
+
+impl TestCase {
+    /// Writes the TestCase to a JSON file on disk
+    /// Creates the directory structure {output_dir}/failed_tests/ and writes to {output_dir}/failed_tests/{filename}
+    pub fn write_to_disk(&self, output_dir: &Path) -> HarvestResult<()> {
+        let failed_tests_dir = output_dir.join("failed_tests");
+
+        // Create the failed_tests directory if it doesn't exist
+        fs::create_dir_all(&failed_tests_dir).map_err(|e| {
+            format!(
+                "Failed to create directory {}: {}",
+                failed_tests_dir.display(),
+                e
+            )
+        })?;
+
+        let file_path = failed_tests_dir.join(&self.filename);
+
+        log::info!("Saving test case to {}", file_path.display());
+
+        let mut json_str = serde_json::to_string_pretty(self)
+            .map_err(|e| format!("Failed to serialize TestCase to JSON: {}", e))?;
+        json_str.push('\n'); // To be consistent with original test vector styling
+
+        fs::write(&file_path, json_str).map_err(|e| {
+            format!(
+                "Failed to write TestCase to file {}: {}",
+                file_path.display(),
+                e
+            )
+        })?;
+
+        Ok(())
+    }
 }
 
 /// Parses a JSON file into a TestCase struct

@@ -230,6 +230,10 @@ async fn benchmark_single_program(
                 let error = format!("Test case {} failed: {}", test_case.filename, e);
                 error_messages.push(error);
                 log::info!("❌ Test case {} failed: {}", test_case.filename, e);
+                // TODO: write to error file
+                test_case
+                    .write_to_disk(&output_dir)
+                    .expect("failed to write test case to disk");
             }
         }
     }
