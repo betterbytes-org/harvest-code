@@ -13,10 +13,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 /// Structured output JSON schema for Ollama.
-const STRUCTURED_OUTPUT_SCHEMA: &str =
-    include_str!("raw_source_to_cargo_llm/structured_schema.json");
+const STRUCTURED_OUTPUT_SCHEMA: &str = include_str!("structured_schema.json");
 
-const SYSTEM_PROMPT: &str = include_str!("raw_source_to_cargo_llm/system_prompt.txt");
+const SYSTEM_PROMPT: &str = include_str!("system_prompt.txt");
 
 pub struct RawSourceToCargoLlm;
 
