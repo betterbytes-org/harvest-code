@@ -69,9 +69,9 @@ pub async fn translate_c_directory_to_rust_project(
         tool_config.max_tokens
     );
     let ir_result = transpile(config);
-    let raw_c_source = raw_source(&ir_result.as_ref().unwrap()).unwrap();
+    let raw_c_source = raw_source(ir_result.as_ref().unwrap()).unwrap();
     raw_c_source
-        .materialize(&output_dir.join("c_src"))
+        .materialize(output_dir.join("c_src"))
         .expect("Failed to materialize C source");
 
     match ir_result {
@@ -112,7 +112,7 @@ pub async fn run_all_benchmarks(
 
 /// Run all benchmarks for a single program
 async fn benchmark_single_program(
-    program_dir: &PathBuf,
+    program_dir: &Path,
     output_root_dir: &Path,
     config_overrides: &[String],
     timeout: u64,

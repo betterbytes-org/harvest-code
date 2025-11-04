@@ -27,7 +27,7 @@ pub fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> H
     let mut wtr = csv::Writer::from_path(file_path)?;
 
     // Write header
-    wtr.write_record(&[
+    wtr.write_record([
         "program_name",
         "translation_success",
         "rust_build_success",
@@ -39,7 +39,7 @@ pub fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> H
 
     // Write data
     for result in results {
-        wtr.write_record(&[
+        wtr.write_record([
             &result.program_name,
             &result.translation_success.to_string(),
             &result.rust_build_success.to_string(),

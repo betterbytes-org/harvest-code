@@ -9,7 +9,7 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct Scheduler {
     queued_invocations: Vec<ToolInvocation>,
-    config: Option<Arc<crate::cli::Config>>,
+    _config: Option<Arc<crate::cli::Config>>,
 }
 
 impl Scheduler {

@@ -1,14 +1,10 @@
 //! Checks if a generated Rust project builds by materializing
 //! it to a tempdir and running `cargo build --release`.
-use crate::cli::unknown_field_warning;
 use crate::tools::{Context, Tool};
 use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-use std::collections::{HashMap, HashSet};
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::collections::HashSet;
+use std::path::PathBuf;
+use std::process::Command;
 
 pub struct TryCargoBuild;
 // Either a vector of compiled artifact filenames (on success)
