@@ -2,6 +2,7 @@ mod cli;
 mod runner;
 mod scheduler;
 mod tools;
+mod util;
 
 #[cfg(test)]
 mod test_util;
@@ -17,6 +18,7 @@ use tools::Tool;
 use tools::load_raw_source::LoadRawSource;
 use tools::raw_source_to_cargo_llm::RawSourceToCargoLlm;
 use tools::try_cargo_build::TryCargoBuild;
+use util::empty_writable_dir;
 
 fn main() {
     if let Err(e) = run() {
@@ -30,10 +32,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if cli::initialize() {
         return Ok(()); // An early-exit argument was passed.
     }
+    let config = get_config();
+    empty_writable_dir(&config.output, config.delete_output_contents)
+        .expect("output directory error");
     let mut ir_organizer = edit::Organizer::default();
     let mut runner = ToolRunner::default();
     let mut scheduler = Scheduler::default();
-    scheduler.queue_invocation(LoadRawSource::new(&get_config().input.clone()));
+    scheduler.queue_invocation(LoadRawSource::new(&config.input.clone()));
     scheduler.queue_invocation(RawSourceToCargoLlm);
     scheduler.queue_invocation(TryCargoBuild);
     loop {

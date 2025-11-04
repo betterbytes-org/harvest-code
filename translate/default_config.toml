@@ -1,5 +1,7 @@
 # The default configurations options for harvest_translate.
 
+delete_output_contents = false
+
 [tools.raw_source_to_cargo_llm]
 address = "http://localhost:11434"
 backend = "ollama"

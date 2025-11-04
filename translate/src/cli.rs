@@ -35,11 +35,17 @@ pub struct Args {
 /// 3. Defaults specified in the code (using `#[serde(default)]`).
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    ///  Path to the directory containing the C code to translate.
+    /// Path to the directory containing the C code to translate.
     pub input: PathBuf,
 
     /// Path to output directory.
     pub output: PathBuf,
+
+    /// If true: if the output directory exists and is nonempty, translate will delete the contents
+    /// of the output directory before running.
+    /// If false: if the output directory exists and is nonempty, translate will output an error
+    /// and exit.
+    pub delete_output_contents: bool,
 
     /// Sub-configuration for each tool.
     pub tools: tools::Config,
