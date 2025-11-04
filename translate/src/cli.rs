@@ -33,7 +33,7 @@ pub struct Args {
 /// 1. Configurations passed using the `--config` command line flag.
 /// 2. A user-specific configuration directory (e.g. `$HOME/.config/harvest/config.toml').
 /// 3. Defaults specified in the code (using `#[serde(default)]`).
-#[derive(Debug, Deserialize)]
+#[derive(Default, Debug, Deserialize)]
 pub struct Config {
     ///  Path to the directory containing the C code to translate.
     pub input: PathBuf,

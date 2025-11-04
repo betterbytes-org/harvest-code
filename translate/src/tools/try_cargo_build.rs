@@ -1,8 +1,7 @@
 //! Checks if a generated Rust project builds by materializing
 //! it to a tempdir and running `cargo build --release`.
-use crate::tools::{Context, Tool};
-use harvest_ir::{HarvestIR, Id, Representation, fs::RawDir};
-use std::collections::HashSet;
+use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
+use harvest_ir::{HarvestIR, Representation, fs::RawDir};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -101,12 +100,19 @@ fn raw_cargo_package(ir: &HarvestIR) -> Result<&RawDir, Box<dyn std::error::Erro
 }
 
 impl Tool for TryCargoBuild {
-    fn might_write(&mut self, ir: &HarvestIR) -> Option<HashSet<Id>> {
-        // We need a cargo_package to be available, but we won't write any existing IDs.
-        raw_cargo_package(ir).ok().map(|_| [].into())
+    fn name(&self) -> &'static str {
+        "TryCargoBuild"
     }
 
-    fn run(&mut self, context: Context) -> Result<(), Box<dyn std::error::Error>> {
+    fn might_write(&mut self, context: MightWriteContext) -> MightWriteOutcome {
+        // We need a cargo_package to be available, but we won't write any existing IDs.
+        match raw_cargo_package(context.ir) {
+            Err(_) => MightWriteOutcome::TryAgain,
+            Ok(_) => MightWriteOutcome::Runnable([].into()),
+        }
+    }
+
+    fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
         // Get cargo package representation
         let cargo_package = raw_cargo_package(&context.ir_snapshot)?;
         let output_path = context.config.output.clone();
