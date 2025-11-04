@@ -55,6 +55,10 @@ impl std::fmt::Display for RawSource {
 }
 
 impl Representation for RawSource {
+    fn name(&self) -> &'static str {
+        "RawSource"
+    }
+
     fn materialize(&self, path: &Path) -> std::io::Result<()> {
         self.dir.materialize(path)
     }

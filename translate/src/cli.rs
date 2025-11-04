@@ -49,6 +49,11 @@ pub struct Config {
     /// Path to output directory.
     pub output: PathBuf,
 
+    /// Path to the diagnostics directory, if you want diagnostics output. If you do not specify a
+    /// diagnostics path, a temporary directory will be created (so that working directories can be
+    /// created for tools) and cleaned up when translate completes.
+    pub diagnostics_dir: Option<PathBuf>,
+
     /// For both the output directory and diagnostics directory (if enabled):
     /// If true: if the directory exists and is nonempty, translate will delete the contents of the
     /// directory before running.
@@ -72,6 +77,7 @@ impl Config {
         Self {
             input: PathBuf::from("mock_input"),
             output: PathBuf::from("mock_output"),
+            diagnostics_dir: None,
             force: false,
             tools: tools::ToolConfigs::mock(),
             unknown: HashMap::new(),

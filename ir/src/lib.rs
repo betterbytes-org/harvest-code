@@ -33,6 +33,9 @@ pub struct HarvestIR {
 
 /// An abstract representation of a program
 pub trait Representation: Any + Display + Send + Sync {
+    /// This representation's name. Used for diagnostics.
+    fn name(&self) -> &'static str;
+
     /// Materialize the [Representation] to a directory at the
     /// provided `path`.
     ///
@@ -100,7 +103,11 @@ mod tests {
             write!(f, "EmptyRepresentation")
         }
     }
-    impl Representation for EmptyRepresentation {}
+    impl Representation for EmptyRepresentation {
+        fn name(&self) -> &'static str {
+            "empty"
+        }
+    }
 
     /// A Representation that contains only an ID number.
     #[derive(Debug, Eq, Hash, PartialEq)]
@@ -110,7 +117,11 @@ mod tests {
             write!(f, "IdRepresentation({})", self.0)
         }
     }
-    impl Representation for IdRepresentation {}
+    impl Representation for IdRepresentation {
+        fn name(&self) -> &'static str {
+            "id"
+        }
+    }
 
     #[test]
     fn get_by_representation() {

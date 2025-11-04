@@ -1,7 +1,7 @@
 use clap::Parser;
 use harvest_translate::cli::{Args, initialize};
 use harvest_translate::transpile;
-use harvest_translate::util::empty_writable_dir;
+use harvest_translate::util::{empty_writable_dir, set_user_only_umask};
 use log::{error, info};
 use std::sync::Arc;
 
@@ -14,6 +14,7 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
+    set_user_only_umask();
     let args: Arc<_> = Args::parse().into();
     let Some(config) = initialize(args) else {
         return Ok(()); // An early-exit argument was passed.

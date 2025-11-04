@@ -20,7 +20,7 @@ use crate::logger::TeeLogger;
 use crate::stats::{ProgramEvalStats, SummaryStats, TestResult};
 use clap::Parser;
 use harvest_ir::HarvestIR;
-use harvest_translate::transpile;
+use harvest_translate::{transpile, util::set_user_only_umask};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -286,6 +286,7 @@ fn benchmark_single_program(
 }
 
 fn main() -> HarvestResult<()> {
+    set_user_only_umask();
     let args = Args::parse();
 
     // Validate input directory exists

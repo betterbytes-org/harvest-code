@@ -136,6 +136,10 @@ impl std::fmt::Display for CargoPackage {
 }
 
 impl Representation for CargoPackage {
+    fn name(&self) -> &'static str {
+        "CargoPackage"
+    }
+
     fn materialize(&self, path: &Path) -> std::io::Result<()> {
         self.dir.materialize(path)
     }
