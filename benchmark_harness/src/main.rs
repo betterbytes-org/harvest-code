@@ -21,6 +21,7 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// Encapsulate important results from transpilation
 pub struct TranspilationResult {
     translation_success: bool,
     build_success: bool,
@@ -29,6 +30,7 @@ pub struct TranspilationResult {
 }
 
 impl TranspilationResult {
+    /// Extract relevant info from HarvestIR
     pub fn from_ir(ir: &HarvestIR) -> Self {
         let translation_success = raw_cargo_package(ir).is_ok();
         let (build_success, rust_binary_path, build_error) = match cargo_build_result(ir) {
@@ -45,7 +47,7 @@ impl TranspilationResult {
     }
 }
 
-// Needs to return path to
+/// Translates a C source directory to a Rust Cargo project using harvest_translate
 pub async fn translate_c_directory_to_rust_project(
     input_dir: &Path,
     output_dir: &Path,
@@ -83,6 +85,7 @@ pub async fn translate_c_directory_to_rust_project(
     }
 }
 
+/// Run all benchmarks for a list of programs
 pub async fn run_all_benchmarks(
     program_dirs: &[PathBuf],
     output_dir: &Path,

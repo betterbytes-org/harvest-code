@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+/// Record program directories
 pub fn log_found_programs(program_dirs: &[PathBuf], input_dir: &Path) -> HarvestResult<()> {
     if program_dirs.is_empty() {
         log::info!("No program directories found in: {}", input_dir.display());
@@ -53,6 +54,7 @@ pub fn write_csv_results(file_path: &PathBuf, results: &[ProgramEvalStats]) -> H
     Ok(())
 }
 
+/// Check that the input directory exists
 pub fn validate_input_directory(input_dir: &Path) -> HarvestResult<()> {
     if !input_dir.exists() || !input_dir.is_dir() {
         return Err(format!(
@@ -80,6 +82,7 @@ pub fn ensure_output_directory(output_dir: &PathBuf) -> HarvestResult<()> {
 }
 
 /// Find all immediate child directories in the input directory
+/// TODO: should probably recursively search instead
 pub fn collect_program_dirs(input_dir: &PathBuf) -> HarvestResult<Vec<PathBuf>> {
     let mut program_dirs = Vec::new();
     for entry in std::fs::read_dir(input_dir)? {
@@ -94,6 +97,7 @@ pub fn collect_program_dirs(input_dir: &PathBuf) -> HarvestResult<Vec<PathBuf>> 
     Ok(program_dirs)
 }
 
+/// Human readable logging of final summary statistics
 pub fn log_summary_stats(summary: &SummaryStats) {
     // Print final summary
     log::info!("\n{}", "=".repeat(80));

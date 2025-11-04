@@ -6,9 +6,7 @@ use std::sync::Mutex;
 
 /// The TeeLogger struct. Takes a file and prints to the file and stdout
 pub struct TeeLogger {
-    // level: LevelFilter,
     file: Mutex<File>,
-    // output_lock: Mutex<()>,
 }
 
 impl TeeLogger {

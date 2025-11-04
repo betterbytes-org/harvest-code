@@ -1,4 +1,4 @@
-/// This module `harness` is intented to contain code that is specific to a particular set of benchmarks,
+/// This module `harness` is intended to contain code that is specific to a particular set of benchmarks,
 /// for example, parsing code for benchmark-specific configs.
 /// Currently, that is just the MITLL tractor benchmarks.
 use crate::runner;
@@ -43,7 +43,8 @@ pub struct TestCase {
 
 impl TestCase {
     /// Writes the TestCase to a JSON file on disk
-    /// Creates the directory structure {output_dir}/failed_tests/ and writes to {output_dir}/failed_tests/{filename}
+    /// Creates the directory structure {output_dir}/failed_tests/ and
+    /// writes to {output_dir}/failed_tests/{filename}
     pub fn write_to_disk(&self, output_dir: &Path) -> HarvestResult<()> {
         let failed_tests_dir = output_dir.join("failed_tests");
 
@@ -58,7 +59,7 @@ impl TestCase {
 
         let file_path = failed_tests_dir.join(&self.filename);
 
-        log::info!("Saving test case to {}", file_path.display());
+        log::info!("Saving failed test case to {}", file_path.display());
 
         let mut json_str = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize TestCase to JSON: {}", e))?;

@@ -3,7 +3,6 @@ use serde::Serialize;
 /// Statistics for a a single test on a program
 #[derive(Debug, Clone, Serialize)]
 pub struct TestResult {
-    // program_name: String,
     pub filename: String,
     pub passed: bool,
 }
@@ -22,7 +21,7 @@ pub struct ProgramEvalStats {
 }
 
 impl ProgramEvalStats {
-    /// Calculate success rate as a float percentage
+    /// Calculate success rate as a percentage
     pub fn success_rate(&self) -> f64 {
         if self.total_tests == 0 {
             0.0
@@ -43,7 +42,7 @@ pub struct SummaryStats {
 }
 
 impl SummaryStats {
-    /// Calculate overall test success rate as a float percentage
+    /// Calculate overall test success rate as a percentage
     pub fn overall_success_rate(&self) -> f64 {
         if self.total_tests == 0 {
             0.0
@@ -52,6 +51,7 @@ impl SummaryStats {
         }
     }
 
+    /// Calculate translation success rate as a percentage
     pub fn translation_success_rate(&self) -> f64 {
         if self.num_programs == 0 {
             0.0
@@ -60,6 +60,7 @@ impl SummaryStats {
         }
     }
 
+    /// Calculate Rust build success rate as a percentage
     pub fn rust_build_success_rate(&self) -> f64 {
         if self.num_programs == 0 {
             0.0
@@ -68,6 +69,7 @@ impl SummaryStats {
         }
     }
 
+    /// Create SummaryStats from a slice of ProgramEvalStats
     pub fn from_results(results: &[ProgramEvalStats]) -> Self {
         // Calculate summary statistics
         SummaryStats {
