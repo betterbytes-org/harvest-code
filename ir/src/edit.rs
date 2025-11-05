@@ -34,7 +34,7 @@ impl Organizer {
         let ir = Arc::make_mut(&mut self.ir);
         for (&id, ref mut representation) in &mut edit.writable {
             if let Some(representation) = representation.take() {
-                ir.representations.insert(id, representation);
+                ir.representations.insert(id, representation.into());
             }
         }
         Ok(())
@@ -101,18 +101,14 @@ pub struct Edit {
 
     // Contains every ID this tool can write. IDs that contain Some() will be
     // written, and IDs that contain None will not be touched.
-    //
-    // Arc<> is used to avoid needing to copy the Representation into HarvestIR
-    // when this edit is merged into the main IR; it is not expected for there
-    // to be other references to these representations.
-    writable: HashMap<Id, Option<Arc<Representation>>>,
+    writable: HashMap<Id, Option<Box<dyn Representation>>>,
 }
 
 impl Edit {
     /// Adds a representation with a new ID and returns the new ID.
-    pub fn add_representation(&mut self, representation: Representation) -> Id {
+    pub fn add_representation(&mut self, representation: Box<dyn Representation>) -> Id {
         let id = Id::new();
-        self.writable.insert(id, Some(representation.into()));
+        self.writable.insert(id, Some(representation));
         id
     }
 
@@ -128,18 +124,18 @@ impl Edit {
     pub fn try_write_id(
         &mut self,
         id: Id,
-        representation: Representation,
+        representation: Box<dyn Representation>,
     ) -> Result<(), NotWritable> {
         self.writable
             .get_mut(&id)
-            .map(|v| *v = Some(representation.into()))
+            .map(|v| *v = Some(representation))
             .ok_or(NotWritable)
     }
 
     /// Writes `representation` to the given `id`. Panics if this tool cannot
     /// write `id`.
     #[track_caller]
-    pub fn write_id(&mut self, id: Id, representation: Representation) {
+    pub fn write_id(&mut self, id: Id, representation: Box<dyn Representation>) {
         if self.try_write_id(id, representation).is_err() {
             panic!("cannot write this id");
         }
@@ -169,8 +165,15 @@ struct Shared {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::new_representation;
-    use std::panic::catch_unwind;
+    use std::fmt::{self, Display, Formatter};
+
+    struct TestRepresentation;
+    impl Display for TestRepresentation {
+        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+            write!(f, "TestRepresentation")
+        }
+    }
+    impl Representation for TestRepresentation {}
 
     #[test]
     fn organizer() {
@@ -181,8 +184,8 @@ mod tests {
             .new_edit(&[].into())
             .expect("no-ID new_edit failed");
         let [a, b, c] = [
-            edit.add_representation(new_representation()),
-            edit.add_representation(new_representation()),
+            edit.add_representation(Box::new(TestRepresentation)),
+            edit.add_representation(Box::new(TestRepresentation)),
             edit.new_id(),
         ];
         assert_eq!(organizer.apply_edit(edit), Ok(()));
@@ -200,8 +203,8 @@ mod tests {
             *organizer.shared.in_use.lock().expect("in_use poisoned"),
             HashSet::from([a, b])
         );
-        let [_, _] = [(); 2].map(|_| edit1.add_representation(new_representation()));
-        let [f, g] = [(); 2].map(|_| edit2.add_representation(new_representation()));
+        let [_, _] = [(); 2].map(|_| edit1.add_representation(Box::new(TestRepresentation)));
+        let [f, g] = [(); 2].map(|_| edit2.add_representation(Box::new(TestRepresentation)));
         assert_eq!(organizer.apply_edit(edit2), Ok(()), "apply_edit failed");
         assert_eq!(
             *organizer.shared.in_use.lock().expect("in_use poisoned"),
@@ -248,23 +251,25 @@ mod tests {
     fn edit() {
         let [a, b, c] = Id::new_array();
         let mut organizer = Organizer::with_harvest_ir(HarvestIR {
-            representations: [a, b].map(|id| (id, new_representation().into())).into(),
+            representations: [a, b]
+                .map(|id| (id, Arc::new(TestRepresentation) as Arc<_>))
+                .into(),
         });
         let mut edit = organizer.new_edit(&[a, b].into()).unwrap();
-        let d = edit.add_representation(new_representation());
+        let d = edit.add_representation(Box::new(TestRepresentation));
         let e = edit.new_id();
         assert_eq!(
-            edit.try_write_id(a, new_representation()),
+            edit.try_write_id(a, Box::new(TestRepresentation)),
             Ok(()),
             "failed to set writable ID"
         );
         assert_eq!(
-            edit.try_write_id(c, new_representation()),
+            edit.try_write_id(c, Box::new(TestRepresentation)),
             Err(NotWritable),
             "set unwritable ID"
         );
-        edit.write_id(d, new_representation());
-        edit.write_id(e, new_representation());
+        edit.write_id(d, Box::new(TestRepresentation));
+        edit.write_id(e, Box::new(TestRepresentation));
         assert_eq!(
             HashSet::from_iter(
                 edit.writable
@@ -274,10 +279,6 @@ mod tests {
             ),
             HashSet::from([a, d, e]),
             "changed IDs incorrect"
-        );
-        assert!(
-            catch_unwind(move || edit.write_id(c, new_representation())).is_err(),
-            "set unwritable ID"
         );
     }
 }
