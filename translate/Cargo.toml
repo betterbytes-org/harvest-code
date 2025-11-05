@@ -3,6 +3,14 @@ name = "harvest_translate"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "translate"
+path = "src/main.rs"
+
+[lib]
+name = "harvest_translate"
+path = "src/lib.rs"
+
 [dependencies]
 cargo_metadata = "0.23.0"
 clap = { features = ["derive"], version = "4.5.45" }
