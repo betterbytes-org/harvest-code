@@ -6,14 +6,14 @@ mod tools;
 #[cfg(test)]
 mod test_util;
 
-use cli::get_config;
+use clap::Parser;
 use harvest_ir::edit::{self, NewEditError};
 use log::{debug, error, info};
 use runner::{SpawnToolError, ToolRunner};
 use scheduler::Scheduler;
+use std::sync::Arc;
 use tools::MightWriteContext;
 use tools::MightWriteOutcome;
-use tools::Tool;
 use tools::load_raw_source::LoadRawSource;
 use tools::raw_source_to_cargo_llm::RawSourceToCargoLlm;
 use tools::try_cargo_build::TryCargoBuild;
@@ -27,13 +27,14 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-    if cli::initialize() {
+    let args: Arc<_> = cli::Args::parse().into();
+    let Some(config) = cli::initialize(args) else {
         return Ok(()); // An early-exit argument was passed.
-    }
+    };
     let mut ir_organizer = edit::Organizer::default();
     let mut runner = ToolRunner::default();
     let mut scheduler = Scheduler::default();
-    scheduler.queue_invocation(LoadRawSource::new(&get_config().input.clone()));
+    scheduler.queue_invocation(LoadRawSource::new(&config.input.clone()));
     scheduler.queue_invocation(RawSourceToCargoLlm);
     scheduler.queue_invocation(TryCargoBuild);
     loop {
@@ -54,7 +55,13 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     return Some(tool);
                 }
             };
-            match runner.spawn_tool(&mut ir_organizer, tool, snapshot.clone(), might_write) {
+            match runner.spawn_tool(
+                &mut ir_organizer,
+                tool,
+                snapshot.clone(),
+                might_write,
+                config.clone(),
+            ) {
                 Err(SpawnToolError {
                     cause: NewEditError::IdInUse,
                     tool,
