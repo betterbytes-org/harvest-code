@@ -40,9 +40,20 @@ impl Tool for RawSourceToCargoLlm {
         // Use the llm crate to connect to Ollama.
 
         let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
+
+        // TODO: This is a workaround for a flaw in the current
+        // version (1.3.4) of the `llm` crate. While it supports
+        // OpenRouter, the `openrouter` variant hadn't been added to
+        // `from_str`. It's fixed on git tip, but not in a release
+        // version. So just check for that case explicitly.
+        let backend = if config.backend == "openrouter" {
+            LLMBackend::OpenRouter
+        } else {
+            LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND")
+        };
         let llm = {
             let mut llm_builder = LLMBuilder::new()
-                .backend(LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND"))
+                .backend(backend)
                 .model(&config.model)
                 .max_tokens(config.max_tokens)
                 .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
