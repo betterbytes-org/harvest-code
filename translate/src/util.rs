@@ -103,5 +103,17 @@ mod tests {
                 other => panic!("unexpected return value: {other:?}"),
             }
         }
+        // Test with an existing file rather than a directory. This case should error, even if
+        // delete_contents is true (because the user probably didn't intend to point the output to
+        // that path).
+        File::create_new(subdir_path("d")).unwrap();
+        match empty_writable_dir(subdir_path("d"), false) {
+            Err(EmptyDirError::IoError(_)) => {}
+            other => panic!("unexpected return value: {other:?}"),
+        }
+        match empty_writable_dir(subdir_path("d"), true) {
+            Err(EmptyDirError::IoError(_)) => {}
+            other => panic!("unexpected return value: {other:?}"),
+        }
     }
 }
