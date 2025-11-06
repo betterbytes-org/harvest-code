@@ -68,8 +68,8 @@ pub fn unknown_field_warning(prefix: &str, unknown: &HashMap<String, Value>) {
 /// Performs parsing and validation of the config; to be called by main() before executing any code
 /// that tries to retrieve the config.
 ///
-/// Returns the config, or None if a command line flag that calls for an early exit (such as --print_config_path)
-/// was provided.
+/// Returns the config, or None if a command line flag that calls for an early exit (such as
+/// --print_config_path) was provided.
 pub fn initialize(args: Arc<Args>) -> Option<Arc<Config>> {
     let dirs = ProjectDirs::from("", "", "harvest").expect("no home directory");
     if args.print_config_path {
