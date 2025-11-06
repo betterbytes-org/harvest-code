@@ -120,7 +120,7 @@ impl std::fmt::Debug for ApiKey {
     }
 }
 
-#[derive(Default, Debug, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
     /// Hostname and port at which to find the LLM serve. Example: "http://[::1]:11434"
     address: Option<String>,
@@ -144,6 +144,18 @@ pub struct Config {
 impl Config {
     pub fn validate(&self) {
         unknown_field_warning("tools.raw_source_to_cargo_llm", &self.unknown);
+    }
+
+    /// Returns a mock config for testing.
+    pub fn mock() -> Self {
+        Self {
+            address: None,
+            api_key: None,
+            backend: "mock_llm".into(),
+            model: "mock_model".into(),
+            max_tokens: 1000,
+            unknown: HashMap::new(),
+        }
     }
 }
 

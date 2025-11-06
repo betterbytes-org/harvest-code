@@ -137,7 +137,7 @@ mod tests {
     fn new_edit_errors() {
         let mut edit_organizer = edit::Organizer::default();
         let mut edit = edit_organizer.new_edit(&[].into()).unwrap();
-        let config = Arc::new(crate::cli::Config::default());
+        let config = Arc::new(crate::cli::Config::mock());
         let [a, b, c] = [(); 3].map(|_| edit.add_representation(RawSource(RawDir::default())));
         edit_organizer.apply_edit(edit).expect("setup edit failed");
         let mut runner = ToolRunner::default();
@@ -202,7 +202,7 @@ mod tests {
         let mut runner = ToolRunner::default();
         let (sender, receiver) = channel();
         let snapshot = edit_organizer.snapshot();
-        let config = Arc::new(crate::cli::Config::default());
+        let config = Arc::new(crate::cli::Config::mock());
         runner
             .spawn_tool(
                 &mut edit_organizer,
@@ -235,7 +235,7 @@ mod tests {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
         let snapshot = edit_organizer.snapshot();
-        let config = Arc::new(crate::cli::Config::default());
+        let config = Arc::new(crate::cli::Config::mock());
         runner
             .spawn_tool(
                 &mut edit_organizer,
@@ -262,7 +262,7 @@ mod tests {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
         let snapshot = edit_organizer.snapshot();
-        let config = Arc::new(crate::cli::Config::default());
+        let config = Arc::new(crate::cli::Config::mock());
         runner
             .spawn_tool(
                 &mut edit_organizer,
@@ -282,7 +282,7 @@ mod tests {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
         let snapshot = edit_organizer.snapshot();
-        let config = Arc::new(crate::cli::Config::default());
+        let config = Arc::new(crate::cli::Config::mock());
         runner
             .spawn_tool(
                 &mut edit_organizer,

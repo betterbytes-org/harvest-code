@@ -33,7 +33,7 @@ pub struct Args {
 /// 1. Configurations passed using the `--config` command line flag.
 /// 2. A user-specific configuration directory (e.g. `$HOME/.config/harvest/config.toml').
 /// 3. Defaults specified in the code (using `#[serde(default)]`).
-#[derive(Default, Debug, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Config {
     ///  Path to the directory containing the C code to translate.
     pub input: PathBuf,
@@ -50,6 +50,18 @@ pub struct Config {
     // commits that have different config options).
     #[serde(flatten)]
     unknown: HashMap<String, Value>,
+}
+
+impl Config {
+    /// Returns a mock config for testing.
+    pub fn mock() -> Self {
+        Self {
+            input: PathBuf::from("mock_input"),
+            output: PathBuf::from("mock_output"),
+            tools: tools::ToolConfigs::mock(),
+            unknown: HashMap::new(),
+        }
+    }
 }
 
 /// Prints out a warning message for every field in `unknown`.
