@@ -86,6 +86,8 @@ mod tests {
     // intended.
     #[test]
     fn new_implementation() {
+        // Use a smaller test size in Miri to keep the test fast and a larger test size for native
+        // execution to make the test more effective.
         #[cfg(not(miri))]
         const CHUNK_SIZE: usize = 100;
         #[cfg(miri)]
