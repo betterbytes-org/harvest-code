@@ -2,6 +2,7 @@
 //! an LLM via the `llm` crate.
 
 use crate::cli::{get_config, unknown_field_warning};
+use crate::tools::load_raw_source::RawSource;
 use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use harvest_ir::{HarvestIR, Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
@@ -9,7 +10,7 @@ use llm::chat::{ChatMessage, StructuredOutputFormat};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 /// Structured output JSON schema for Ollama.
@@ -117,8 +118,26 @@ impl Tool for RawSourceToCargoLlm {
         }
         context
             .ir_edit
-            .add_representation(Representation::CargoPackage(out_dir));
+            .add_representation(Box::new(CargoPackage { dir: out_dir }));
         Ok(())
+    }
+}
+
+/// A cargo project representation (Cargo.toml, src/, etc).
+pub struct CargoPackage {
+    pub dir: RawDir,
+}
+
+impl std::fmt::Display for CargoPackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "Cargo package:")?;
+        self.dir.display(0, f)
+    }
+}
+
+impl Representation for CargoPackage {
+    fn materialize(&self, path: &Path) -> std::io::Result<()> {
+        self.dir.materialize(path)
     }
 }
 
@@ -161,10 +180,9 @@ impl Config {
 /// Returns the RawSource representation in IR. If there are multiple RawSource representations,
 /// returns an arbitrary one.
 fn raw_source(ir: &HarvestIR) -> Option<&RawDir> {
-    ir.iter().find_map(|(_, repr)| match repr {
-        Representation::RawSource(r) => Some(r),
-        _ => None,
-    })
+    ir.get_by_representation::<RawSource>()
+        .next()
+        .map(|(_, r)| &r.dir)
 }
 
 /// Structure representing a file created by the LLM.

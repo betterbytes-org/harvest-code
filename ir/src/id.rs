@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::num::NonZeroU64;
 use std::process::abort;
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
@@ -38,6 +39,12 @@ impl Id {
     }
 }
 
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "Id({})", self.0)
+    }
+}
+
 // `Id::new_array`, but with an injected AtomicU64. This allows `tests::new` to
 // use its own AtomicU64, which prevents other tests that are run in parallel
 // from interfering with it.
@@ -65,6 +72,14 @@ mod tests {
     use super::*;
     use std::collections::HashSet;
     use std::thread::{scope, spawn};
+
+    #[test]
+    fn display() {
+        assert_eq!(
+            format!("{}", Id(NonZeroU64::new(1234).unwrap())),
+            "Id(1234)"
+        );
+    }
 
     // Verifies that Id::new and Id::new_array return unique IDs (to verify they
     // correctly use new_array_testable).
