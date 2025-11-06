@@ -2,6 +2,7 @@
 //! an LLM via the `llm` crate.
 
 use crate::cli::{get_config, unknown_field_warning};
+use crate::tools::load_raw_source::RawSource;
 use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use harvest_ir::{HarvestIR, Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
@@ -9,14 +10,13 @@ use llm::chat::{ChatMessage, StructuredOutputFormat};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 /// Structured output JSON schema for Ollama.
-const STRUCTURED_OUTPUT_SCHEMA: &str =
-    include_str!("raw_source_to_cargo_llm/structured_schema.json");
+const STRUCTURED_OUTPUT_SCHEMA: &str = include_str!("structured_schema.json");
 
-const SYSTEM_PROMPT: &str = include_str!("raw_source_to_cargo_llm/system_prompt.txt");
+const SYSTEM_PROMPT: &str = include_str!("system_prompt.txt");
 
 pub struct RawSourceToCargoLlm;
 
@@ -41,9 +41,20 @@ impl Tool for RawSourceToCargoLlm {
         // Use the llm crate to connect to Ollama.
 
         let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
+
+        // TODO: This is a workaround for a flaw in the current
+        // version (1.3.4) of the `llm` crate. While it supports
+        // OpenRouter, the `openrouter` variant hadn't been added to
+        // `from_str`. It's fixed on git tip, but not in a release
+        // version. So just check for that case explicitly.
+        let backend = if config.backend == "openrouter" {
+            LLMBackend::OpenRouter
+        } else {
+            LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND")
+        };
         let llm = {
             let mut llm_builder = LLMBuilder::new()
-                .backend(LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND"))
+                .backend(backend)
                 .model(&config.model)
                 .max_tokens(config.max_tokens)
                 .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
@@ -107,8 +118,26 @@ impl Tool for RawSourceToCargoLlm {
         }
         context
             .ir_edit
-            .add_representation(Representation::CargoPackage(out_dir));
+            .add_representation(Box::new(CargoPackage { dir: out_dir }));
         Ok(())
+    }
+}
+
+/// A cargo project representation (Cargo.toml, src/, etc).
+pub struct CargoPackage {
+    pub dir: RawDir,
+}
+
+impl std::fmt::Display for CargoPackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "Cargo package:")?;
+        self.dir.display(0, f)
+    }
+}
+
+impl Representation for CargoPackage {
+    fn materialize(&self, path: &Path) -> std::io::Result<()> {
+        self.dir.materialize(path)
     }
 }
 
@@ -151,10 +180,9 @@ impl Config {
 /// Returns the RawSource representation in IR. If there are multiple RawSource representations,
 /// returns an arbitrary one.
 fn raw_source(ir: &HarvestIR) -> Option<&RawDir> {
-    ir.iter().find_map(|(_, repr)| match repr {
-        Representation::RawSource(r) => Some(r),
-        _ => None,
-    })
+    ir.get_by_representation::<RawSource>()
+        .next()
+        .map(|(_, r)| &r.dir)
 }
 
 /// Structure representing a file created by the LLM.

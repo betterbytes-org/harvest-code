@@ -1,9 +1,10 @@
 //! Checks if a generated Rust project builds by materializing
 //! it to a tempdir and running `cargo build --release`.
 use crate::cli::get_config;
+use crate::tools::raw_source_to_cargo_llm::CargoPackage;
 use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use harvest_ir::{HarvestIR, Representation, fs::RawDir};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub struct TryCargoBuild;
@@ -82,11 +83,8 @@ fn try_cargo_build(project_path: &PathBuf) -> Result<BuildResult, Box<dyn std::e
 /// return an error.
 fn raw_cargo_package(ir: &HarvestIR) -> Result<&RawDir, Box<dyn std::error::Error>> {
     let cargo_packages: Vec<&RawDir> = ir
-        .iter()
-        .filter_map(|(_, repr)| match repr {
-            Representation::CargoPackage(r) => Some(r),
-            _ => None,
-        })
+        .get_by_representation::<CargoPackage>()
+        .map(|(_, r)| &r.dir)
         .collect();
 
     match cargo_packages.len() {
@@ -124,8 +122,36 @@ impl Tool for TryCargoBuild {
         // Write result to IR
         context
             .ir_edit
-            .add_representation(Representation::CargoBuildResult(compilation_result));
+            .add_representation(Box::new(CargoBuildResult {
+                result: compilation_result,
+            }));
 
+        Ok(())
+    }
+}
+
+/// A Representation that contains the results of running `cargo build`.
+pub struct CargoBuildResult {
+    result: Result<Vec<PathBuf>, String>,
+}
+
+impl std::fmt::Display for CargoBuildResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "Built Rust artifact:")?;
+        let artifact_filenames = match &self.result {
+            Err(err) => return writeln!(f, "  Build failed: {err}"),
+            Ok(filenames) => filenames,
+        };
+        writeln!(f, "  Build succeeded. Artifacts:")?;
+        for filename in artifact_filenames {
+            writeln!(f, "    {}", filename.display())?;
+        }
+        Ok(())
+    }
+}
+
+impl Representation for CargoBuildResult {
+    fn materialize(&self, _path: &Path) -> std::io::Result<()> {
         Ok(())
     }
 }

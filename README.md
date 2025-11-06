@@ -35,6 +35,25 @@ docker container run ollama pull codellama:7b  # If using Docker
 
 You will need to have Ollama running to run harvest_translate.
 
+### Remote OpenAI instance
+
+First, you'll need to provision an [OpenAI API key](https://platform.openai.com/api-keys).
+
+Then, you'll need to set up a custom Harvest config file:
+```toml 
+[tools.raw_source_to_cargo_llm]
+backend = "openai"
+model = "gpt-4o"
+api_key = "your_key_here" # Will be read from environment if empty
+address = ""  # Not needed for OpenAI
+max_tokens = 16384
+```
+You should place this config at the OS-dependent harvest config location, which you can find by running:
+```bash
+cargo run -- --print-config-path
+``` 
+
+
 ## Running
 
 ### Translate C code to Rust

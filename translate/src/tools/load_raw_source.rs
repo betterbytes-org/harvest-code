@@ -35,8 +35,27 @@ impl Tool for LoadRawSource {
             "Loaded {directories} directories and {files} files from {}.",
             self.directory.display()
         );
-        let representation = Representation::RawSource(rawdir);
-        context.ir_edit.add_representation(representation);
+        context
+            .ir_edit
+            .add_representation(Box::new(RawSource { dir: rawdir }));
         Ok(())
+    }
+}
+
+/// A raw C project passed as input.
+pub struct RawSource {
+    pub dir: RawDir,
+}
+
+impl std::fmt::Display for RawSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "Raw C source:")?;
+        self.dir.display(0, f)
+    }
+}
+
+impl Representation for RawSource {
+    fn materialize(&self, path: &Path) -> std::io::Result<()> {
+        self.dir.materialize(path)
     }
 }

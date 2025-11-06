@@ -1,3 +1,4 @@
+use std::fmt::{self, Display, Formatter};
 use std::num::NonZeroU64;
 use std::process::abort;
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
@@ -38,6 +39,12 @@ impl Id {
     }
 }
 
+impl Display for Id {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "Id({})", self.0)
+    }
+}
+
 // `Id::new_array`, but with an injected AtomicU64. This allows `tests::new` to
 // use its own AtomicU64, which prevents other tests that are run in parallel
 // from interfering with it.
@@ -66,6 +73,14 @@ mod tests {
     use std::collections::HashSet;
     use std::thread::{scope, spawn};
 
+    #[test]
+    fn display() {
+        assert_eq!(
+            format!("{}", Id(NonZeroU64::new(1234).unwrap())),
+            "Id(1234)"
+        );
+    }
+
     // Verifies that Id::new and Id::new_array return unique IDs (to verify they
     // correctly use new_array_testable).
     #[test]
@@ -86,23 +101,29 @@ mod tests {
     // intended.
     #[test]
     fn new_implementation() {
+        // Use a smaller test size in Miri to keep the test fast and a larger test size for native
+        // execution to make the test more effective.
+        #[cfg(not(miri))]
+        const CHUNK_SIZE: usize = 100;
+        #[cfg(miri)]
+        const CHUNK_SIZE: usize = 10;
         let highest_id = &AtomicU64::new(0);
         // Generate IDs from three unsynchronized threads, hoping they run at
         // the same time. Each thread uses a different strategy, but each thread
         // generates exactly 1000 IDs.
         let id_vecs: [Vec<Id>; 3] = scope(|s| {
             let one_at_a_time = s.spawn(|| {
-                (0..1000)
+                (0..10 * CHUNK_SIZE)
                     .map(|_| new_array_testable::<1>(highest_id)[0])
                     .collect()
             });
             let chunks = s.spawn(|| {
                 (0..10)
-                    .map(|_| new_array_testable::<100>(highest_id))
+                    .map(|_| new_array_testable::<CHUNK_SIZE>(highest_id))
                     .flatten()
                     .collect()
             });
-            let all_at_once = new_array_testable::<1000>(highest_id).into();
+            let all_at_once = new_array_testable::<{ 10 * CHUNK_SIZE }>(highest_id).into();
             [
                 all_at_once,
                 chunks.join().unwrap(),
@@ -110,12 +131,12 @@ mod tests {
             ]
         });
         // This loop verifies the IDs generated are exactly 1..=3000.
-        let mut found = [false; 3000];
+        let mut found = [false; 30 * CHUNK_SIZE];
         for Id(n) in id_vecs.iter().flatten() {
             let entry = found.get_mut(n.get() as usize - 1).expect("too-large ID");
             assert!(!*entry, "duplicate ID {}", n);
             *entry = true;
         }
-        assert_eq!(found, [true; 3000], "missing ID");
+        assert_eq!(found, [true; 30 * CHUNK_SIZE], "missing ID");
     }
 }

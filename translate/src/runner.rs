@@ -127,15 +127,23 @@ struct RunningInvocation {
 mod tests {
     use super::*;
     use crate::{MightWriteOutcome::Runnable, test_util::MockTool};
-    use harvest_ir::Representation::RawSource;
+    use harvest_ir::Representation;
     use harvest_ir::edit::{self, NewEditError};
-    use harvest_ir::fs::RawDir;
+    use std::fmt::{self, Display, Formatter};
+
+    struct TestRepresentation;
+    impl Display for TestRepresentation {
+        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+            write!(f, "TestRepresentation")
+        }
+    }
+    impl Representation for TestRepresentation {}
 
     #[test]
     fn new_edit_errors() {
         let mut edit_organizer = edit::Organizer::default();
         let mut edit = edit_organizer.new_edit(&[].into()).unwrap();
-        let [a, b, c] = [(); 3].map(|_| edit.add_representation(RawSource(RawDir::default())));
+        let [a, b, c] = [(); 3].map(|_| edit.add_representation(Box::new(TestRepresentation)));
         edit_organizer.apply_edit(edit).expect("setup edit failed");
         let mut runner = ToolRunner::default();
         let unknown_id = Id::new();
@@ -191,7 +199,7 @@ mod tests {
     fn replaced_edit() {
         let mut edit_organizer = edit::Organizer::default();
         let mut edit = edit_organizer.new_edit(&[].into()).unwrap();
-        let a = edit.add_representation(RawSource(RawDir::default()));
+        let a = edit.add_representation(Box::new(TestRepresentation));
         edit_organizer.apply_edit(edit).expect("setup edit failed");
         let mut runner = ToolRunner::default();
         let (sender, receiver) = channel();
@@ -213,7 +221,7 @@ mod tests {
         // Verify that `a` was marked as in use
         assert!(edit_organizer.new_edit(&[a].into()).err() == Some(NewEditError::IdInUse));
         let mut edit = edit_organizer.new_edit(&[].into()).unwrap();
-        let b = edit.add_representation(RawSource(RawDir::default()));
+        let b = edit.add_representation(Box::new(TestRepresentation));
         sender.send(edit).expect("receiver dropped");
         runner.process_tool_results(&mut edit_organizer);
         let ir_ids: Vec<Id> = edit_organizer.snapshot().iter().map(|(id, _)| id).collect();
@@ -232,7 +240,7 @@ mod tests {
                 &mut edit_organizer,
                 MockTool::new()
                     .run(|c| {
-                        c.ir_edit.add_representation(RawSource(RawDir::default()));
+                        c.ir_edit.add_representation(Box::new(TestRepresentation));
                         Ok(())
                     })
                     .boxed(),
