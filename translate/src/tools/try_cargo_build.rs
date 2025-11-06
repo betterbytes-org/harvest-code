@@ -84,7 +84,7 @@ fn try_cargo_build(project_path: &PathBuf) -> Result<BuildResult, Box<dyn std::e
 fn raw_cargo_package(ir: &HarvestIR) -> Result<&RawDir, Box<dyn std::error::Error>> {
     let cargo_packages: Vec<&RawDir> = ir
         .get_by_representation::<CargoPackage>()
-        .map(|r| &r.dir)
+        .map(|(_, r)| &r.dir)
         .collect();
 
     match cargo_packages.len() {

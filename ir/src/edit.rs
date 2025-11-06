@@ -165,15 +165,7 @@ struct Shared {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt::{self, Display, Formatter};
-
-    struct TestRepresentation;
-    impl Display for TestRepresentation {
-        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-            write!(f, "TestRepresentation")
-        }
-    }
-    impl Representation for TestRepresentation {}
+    use crate::tests::EmptyRepresentation;
 
     #[test]
     fn organizer() {
@@ -184,8 +176,8 @@ mod tests {
             .new_edit(&[].into())
             .expect("no-ID new_edit failed");
         let [a, b, c] = [
-            edit.add_representation(Box::new(TestRepresentation)),
-            edit.add_representation(Box::new(TestRepresentation)),
+            edit.add_representation(Box::new(EmptyRepresentation)),
+            edit.add_representation(Box::new(EmptyRepresentation)),
             edit.new_id(),
         ];
         assert_eq!(organizer.apply_edit(edit), Ok(()));
@@ -203,8 +195,8 @@ mod tests {
             *organizer.shared.in_use.lock().expect("in_use poisoned"),
             HashSet::from([a, b])
         );
-        let [_, _] = [(); 2].map(|_| edit1.add_representation(Box::new(TestRepresentation)));
-        let [f, g] = [(); 2].map(|_| edit2.add_representation(Box::new(TestRepresentation)));
+        let [_, _] = [(); 2].map(|_| edit1.add_representation(Box::new(EmptyRepresentation)));
+        let [f, g] = [(); 2].map(|_| edit2.add_representation(Box::new(EmptyRepresentation)));
         assert_eq!(organizer.apply_edit(edit2), Ok(()), "apply_edit failed");
         assert_eq!(
             *organizer.shared.in_use.lock().expect("in_use poisoned"),
@@ -252,24 +244,24 @@ mod tests {
         let [a, b, c] = Id::new_array();
         let mut organizer = Organizer::with_harvest_ir(HarvestIR {
             representations: [a, b]
-                .map(|id| (id, Arc::new(TestRepresentation) as Arc<_>))
+                .map(|id| (id, Arc::new(EmptyRepresentation) as Arc<_>))
                 .into(),
         });
         let mut edit = organizer.new_edit(&[a, b].into()).unwrap();
-        let d = edit.add_representation(Box::new(TestRepresentation));
+        let d = edit.add_representation(Box::new(EmptyRepresentation));
         let e = edit.new_id();
         assert_eq!(
-            edit.try_write_id(a, Box::new(TestRepresentation)),
+            edit.try_write_id(a, Box::new(EmptyRepresentation)),
             Ok(()),
             "failed to set writable ID"
         );
         assert_eq!(
-            edit.try_write_id(c, Box::new(TestRepresentation)),
+            edit.try_write_id(c, Box::new(EmptyRepresentation)),
             Err(NotWritable),
             "set unwritable ID"
         );
-        edit.write_id(d, Box::new(TestRepresentation));
-        edit.write_id(e, Box::new(TestRepresentation));
+        edit.write_id(d, Box::new(EmptyRepresentation));
+        edit.write_id(e, Box::new(EmptyRepresentation));
         assert_eq!(
             HashSet::from_iter(
                 edit.writable

@@ -47,6 +47,13 @@ pub trait Representation: Any + Display + Send + Sync {
 }
 
 impl HarvestIR {
+    /// Adds a representation with a new ID and returns the new ID.
+    pub fn add_representation(&mut self, representation: Box<dyn Representation>) -> Id {
+        let id = Id::new();
+        self.representations.insert(id, representation.into());
+        id
+    }
+
     /// Returns `true` if this `HarvestIR` contains a representation under ID `id`, `false`
     /// otherwise.
     pub fn contains_id(&self, id: Id) -> bool {
@@ -54,12 +61,12 @@ impl HarvestIR {
     }
 
     /// Returns all contained Representations of the given type.
-    pub fn get_by_representation<R: Representation>(&self) -> impl Iterator<Item = &R> {
+    pub fn get_by_representation<R: Representation>(&self) -> impl Iterator<Item = (Id, &R)> {
         // TODO: Add a `TypeId -> Id` map to HarvestIR that allows us to look these up without
         // scanning through all the other representations.
         self.representations
-            .values()
-            .filter_map(|repr| <dyn Any>::downcast_ref(repr))
+            .iter()
+            .filter_map(|(&i, r)| <dyn Any>::downcast_ref(&**r).map(|r| (i, r)))
     }
 
     /// Returns an iterator over the IDs and representations in this IR.
@@ -74,5 +81,44 @@ impl Display for HarvestIR {
             writeln!(f, "{i}: {r}")?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+    use std::fmt::{self, Display, Formatter};
+
+    /// A simple Representation that contains no data.
+    pub struct EmptyRepresentation;
+    impl Display for EmptyRepresentation {
+        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+            write!(f, "EmptyRepresentation")
+        }
+    }
+    impl Representation for EmptyRepresentation {}
+
+    /// A Representation that contains only an ID number.
+    #[derive(Debug, Eq, Hash, PartialEq)]
+    pub struct IdRepresentation(pub usize);
+    impl Display for IdRepresentation {
+        fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+            write!(f, "IdRepresentation({})", self.0)
+        }
+    }
+    impl Representation for IdRepresentation {}
+
+    #[test]
+    fn get_by_representation() {
+        let mut ir = HarvestIR::default();
+        ir.add_representation(Box::new(EmptyRepresentation));
+        let b = ir.add_representation(Box::new(IdRepresentation(1)));
+        ir.add_representation(Box::new(EmptyRepresentation));
+        let d = ir.add_representation(Box::new(IdRepresentation(2)));
+        assert_eq!(
+            HashSet::from_iter(ir.get_by_representation::<IdRepresentation>()),
+            HashSet::from([(b, &IdRepresentation(1)), (d, &IdRepresentation(2))])
+        );
     }
 }

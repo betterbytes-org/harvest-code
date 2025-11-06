@@ -171,7 +171,7 @@ impl Config {
 fn raw_source(ir: &HarvestIR) -> Option<&RawDir> {
     ir.get_by_representation::<RawSource>()
         .next()
-        .map(|r| &r.dir)
+        .map(|(_, r)| &r.dir)
 }
 
 /// Structure representing a file created by the LLM.
