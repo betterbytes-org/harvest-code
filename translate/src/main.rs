@@ -33,8 +33,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(()); // An early-exit argument was passed.
     }
     let config = get_config();
-    empty_writable_dir(&config.output, config.delete_output_contents)
-        .expect("output directory error");
+    empty_writable_dir(&config.output, config.force).expect("output directory error");
     let mut ir_organizer = edit::Organizer::default();
     let mut runner = ToolRunner::default();
     let mut scheduler = Scheduler::default();

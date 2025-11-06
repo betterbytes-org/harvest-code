@@ -14,6 +14,10 @@ pub struct Args {
     #[arg(long, short)]
     pub config: Vec<String>,
 
+    /// Erase the output/diagnostics directories if nonempty.
+    #[arg(long, short)]
+    pub force: bool,
+
     /// Path to the directory containing the C code to translate.
     // Should always be present unless using a subcommand like --print-config-path
     pub input: Option<PathBuf>,
@@ -41,11 +45,11 @@ pub struct Config {
     /// Path to output directory.
     pub output: PathBuf,
 
-    /// If true: if the output directory exists and is nonempty, translate will delete the contents
-    /// of the output directory before running.
-    /// If false: if the output directory exists and is nonempty, translate will output an error
-    /// and exit.
-    pub delete_output_contents: bool,
+    /// For both the output directory and diagnostics directory (if enabled):
+    /// If true: if the directory exists and is nonempty, translate will delete the contents of the
+    /// directory before running.
+    /// If false: if the directory exists and is nonempty, translate will output an error and exit.
+    pub force: bool,
 
     /// Sub-configuration for each tool.
     pub tools: tools::Config,
@@ -116,6 +120,12 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
         };
         settings = settings
             .set_override(name, value)
+            .expect("settings override failed");
+    }
+
+    if args.force {
+        settings = settings
+            .set_override("force", "true")
             .expect("settings override failed");
     }
 
@@ -209,6 +219,14 @@ mod tests {
             )
             .input,
             AsRef::<Path>::as_ref("d")
+        );
+        // Verify --force enables the force option.
+        assert!(
+            load_config(
+                &Args::parse_from(["", "--force", "--output=/tmp/out"]),
+                config_dir.path()
+            )
+            .force
         );
     }
 }
