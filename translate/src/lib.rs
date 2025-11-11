@@ -1,10 +1,12 @@
-pub mod cli;
-pub mod runner;
-pub mod scheduler;
-pub mod tools;
+mod cli;
+mod runner;
+mod scheduler;
+mod tools;
 
 #[cfg(test)]
 mod test_util;
+
+pub use cli::{Args, initialize};
 
 use crate::load_raw_source::LoadRawSource;
 use crate::tools::raw_source_to_cargo_llm::RawSourceToCargoLlm;
