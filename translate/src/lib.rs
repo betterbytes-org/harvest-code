@@ -2,6 +2,7 @@ mod cli;
 mod runner;
 mod scheduler;
 mod tools;
+pub mod util;
 
 #[cfg(test)]
 mod test_util;
