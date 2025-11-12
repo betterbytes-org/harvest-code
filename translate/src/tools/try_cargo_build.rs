@@ -1,6 +1,5 @@
 //! Checks if a generated Rust project builds by materializing
 //! it to a tempdir and running `cargo build --release`.
-use crate::cli::get_config;
 use crate::tools::raw_source_to_cargo_llm::CargoPackage;
 use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use harvest_ir::{HarvestIR, Representation, fs::RawDir};
@@ -114,7 +113,7 @@ impl Tool for TryCargoBuild {
     fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
         // Get cargo package representation
         let cargo_package = raw_cargo_package(&context.ir_snapshot)?;
-        let output_path = get_config().output.clone();
+        let output_path = context.config.output.clone();
         cargo_package.materialize(&output_path)?;
 
         // Validate that the Rust project builds

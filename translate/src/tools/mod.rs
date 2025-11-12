@@ -10,17 +10,25 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
-pub struct Config {
-    raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
+pub struct ToolConfigs {
+    pub raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
 
     #[serde(flatten)]
     unknown: HashMap<String, Value>,
 }
 
-impl Config {
+impl ToolConfigs {
     pub fn validate(&self) {
         unknown_field_warning("tools", &self.unknown);
         self.raw_source_to_cargo_llm.validate();
+    }
+
+    /// Returns a mock config for testing.
+    pub fn mock() -> Self {
+        Self {
+            raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config::mock(),
+            unknown: HashMap::new(),
+        }
     }
 }
 
@@ -90,4 +98,7 @@ pub struct RunContext<'a> {
     /// Read access to the IR. This will be the same IR as `might_write` was
     /// most recently called with.
     pub ir_snapshot: Arc<HarvestIR>,
+
+    /// Configuration for the current harvest_translate run.
+    pub config: Arc<crate::cli::Config>,
 }

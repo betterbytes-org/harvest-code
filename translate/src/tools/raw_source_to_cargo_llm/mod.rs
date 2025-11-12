@@ -1,8 +1,8 @@
 //! Attempts to directly turn a C project into a Cargo project by throwing it at
 //! an LLM via the `llm` crate.
 
-use crate::cli::{get_config, unknown_field_warning};
-use crate::tools::load_raw_source::RawSource;
+use crate::cli::unknown_field_warning;
+use crate::load_raw_source::RawSource;
 use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use harvest_ir::{HarvestIR, Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
@@ -34,7 +34,7 @@ impl Tool for RawSourceToCargoLlm {
     }
 
     fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
-        let config = &get_config().tools.raw_source_to_cargo_llm;
+        let config = &context.config.tools.raw_source_to_cargo_llm;
         log::debug!("LLM Configuration {config:?}");
         let in_dir = raw_source(&context.ir_snapshot).unwrap();
 
@@ -159,13 +159,13 @@ pub struct Config {
     api_key: Option<ApiKey>,
 
     /// Which backend to use, e.g. "ollama".
-    backend: String,
+    pub backend: String,
 
     /// Name of the model to invoke.
-    model: String,
+    pub model: String,
 
     /// Maximum output tokens.
-    max_tokens: u32,
+    pub max_tokens: u32,
 
     #[serde(flatten)]
     unknown: HashMap<String, Value>,
@@ -174,6 +174,18 @@ pub struct Config {
 impl Config {
     pub fn validate(&self) {
         unknown_field_warning("tools.raw_source_to_cargo_llm", &self.unknown);
+    }
+
+    /// Returns a mock config for testing.
+    pub fn mock() -> Self {
+        Self {
+            address: None,
+            api_key: None,
+            backend: "mock_llm".into(),
+            model: "mock_model".into(),
+            max_tokens: 1000,
+            unknown: HashMap::new(),
+        }
     }
 }
 
