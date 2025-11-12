@@ -1,5 +1,6 @@
 use clap::Parser;
-use harvest_translate::{Args, initialize, transpile};
+use harvest_translate::cli::{Args, initialize};
+use harvest_translate::transpile;
 use log::{error, info};
 use std::sync::Arc;
 

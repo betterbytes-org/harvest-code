@@ -1,4 +1,4 @@
-//! Type representing a filesystem. Example use cases: representing a C source project, a Cargo
+//! Types representing a filesystem. Example use cases: representing a C source project, a Cargo
 //! project, etc.
 
 use std::collections::{BTreeMap, btree_map};
@@ -215,6 +215,7 @@ impl RawDir {
     }
 }
 
+/// Error type returned by [RawDir::set_file].
 #[derive(Debug, Eq, Hash, PartialEq, thiserror::Error)]
 pub enum SetFileError {
     #[error("tried to set file at absolute path")]
