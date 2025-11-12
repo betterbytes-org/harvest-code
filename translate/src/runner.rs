@@ -64,6 +64,7 @@ impl ToolRunner {
         tool: Box<dyn Tool>,
         ir_snapshot: Arc<HarvestIR>,
         might_write: HashSet<Id>,
+        config: Arc<crate::cli::Config>,
     ) -> Result<(), SpawnToolError> {
         let mut edit = match edit_organizer.new_edit(&might_write) {
             Err(error) => return Err(SpawnToolError { cause: error, tool }),
@@ -82,6 +83,7 @@ impl ToolRunner {
                 tool.run(RunContext {
                     ir_edit: &mut edit,
                     ir_snapshot,
+                    config,
                 })
                 .map(|_| edit)
             }));
@@ -143,6 +145,7 @@ mod tests {
     fn new_edit_errors() {
         let mut edit_organizer = edit::Organizer::default();
         let mut edit = edit_organizer.new_edit(&[].into()).unwrap();
+        let config = Arc::new(crate::cli::Config::mock());
         let [a, b, c] = [(); 3].map(|_| edit.add_representation(Box::new(TestRepresentation)));
         edit_organizer.apply_edit(edit).expect("setup edit failed");
         let mut runner = ToolRunner::default();
@@ -156,7 +159,8 @@ mod tests {
                         .might_write(move |_| Runnable([a, unknown_id].into()))
                         .boxed(),
                     snapshot.clone(),
-                    [a, unknown_id].into()
+                    [a, unknown_id].into(),
+                    config.clone(),
                 )
                 .err()
                 .map(|e| e.cause),
@@ -173,6 +177,7 @@ mod tests {
                         .boxed(),
                     snapshot.clone(),
                     [a, b].into(),
+                    config.clone(),
                 )
                 .is_ok()
         );
@@ -184,7 +189,8 @@ mod tests {
                         .might_write(move |_| Runnable([b, c].into()))
                         .boxed(),
                     snapshot,
-                    [b, c].into()
+                    [b, c].into(),
+                    config.clone(),
                 )
                 .err()
                 .map(|e| e.cause),
@@ -204,6 +210,7 @@ mod tests {
         let mut runner = ToolRunner::default();
         let (sender, receiver) = channel();
         let snapshot = edit_organizer.snapshot();
+        let config = Arc::new(crate::cli::Config::mock());
         runner
             .spawn_tool(
                 &mut edit_organizer,
@@ -216,6 +223,7 @@ mod tests {
                     .boxed(),
                 snapshot,
                 [a].into(),
+                config.clone(),
             )
             .expect("tool spawn failed");
         // Verify that `a` was marked as in use
@@ -235,6 +243,7 @@ mod tests {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
         let snapshot = edit_organizer.snapshot();
+        let config = Arc::new(crate::cli::Config::mock());
         runner
             .spawn_tool(
                 &mut edit_organizer,
@@ -246,6 +255,7 @@ mod tests {
                     .boxed(),
                 snapshot,
                 [].into(),
+                config.clone(),
             )
             .expect("tool spawn failed");
         let ir_count = edit_organizer.snapshot().iter().count();
@@ -260,12 +270,14 @@ mod tests {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
         let snapshot = edit_organizer.snapshot();
+        let config = Arc::new(crate::cli::Config::mock());
         runner
             .spawn_tool(
                 &mut edit_organizer,
                 MockTool::new().run(|_| Err("test error".into())).boxed(),
                 snapshot,
                 [].into(),
+                config.clone(),
             )
             .expect("tool spawn failed");
         runner.process_tool_results(&mut edit_organizer);
@@ -278,12 +290,14 @@ mod tests {
         let mut edit_organizer = edit::Organizer::default();
         let mut runner = ToolRunner::default();
         let snapshot = edit_organizer.snapshot();
+        let config = Arc::new(crate::cli::Config::mock());
         runner
             .spawn_tool(
                 &mut edit_organizer,
                 MockTool::new().run(|_| panic!("test panic")).boxed(),
                 snapshot,
                 [].into(),
+                config.clone(),
             )
             .expect("tool spawn failed");
         runner.process_tool_results(&mut edit_organizer);
