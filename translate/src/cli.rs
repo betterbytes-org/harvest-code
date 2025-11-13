@@ -18,6 +18,10 @@ pub struct Args {
     #[arg(long, short)]
     pub config: Vec<String>,
 
+    /// Erase the output/diagnostics directories if nonempty.
+    #[arg(long, short)]
+    pub force: bool,
+
     /// Path to the directory containing the C code to translate.
     // Should always be present unless using a subcommand like --print-config-path
     pub input: Option<PathBuf>,
@@ -39,11 +43,17 @@ pub struct Args {
 /// 3. Defaults specified in the code (using `#[serde(default)]`).
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    ///  Path to the directory containing the C code to translate.
+    /// Path to the directory containing the C code to translate.
     pub input: PathBuf,
 
     /// Path to output directory.
     pub output: PathBuf,
+
+    /// For both the output directory and diagnostics directory (if enabled):
+    /// If true: if the directory exists and is nonempty, translate will delete the contents of the
+    /// directory before running.
+    /// If false: if the directory exists and is nonempty, translate will output an error and exit.
+    pub force: bool,
 
     /// Sub-configuration for each tool.
     pub tools: tools::ToolConfigs,
@@ -62,6 +72,7 @@ impl Config {
         Self {
             input: PathBuf::from("mock_input"),
             output: PathBuf::from("mock_output"),
+            force: false,
             tools: tools::ToolConfigs::mock(),
             unknown: HashMap::new(),
         }
@@ -112,6 +123,12 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
         };
         settings = settings
             .set_override(name, value)
+            .expect("settings override failed");
+    }
+
+    if args.force {
+        settings = settings
+            .set_override("force", "true")
             .expect("settings override failed");
     }
 
@@ -205,6 +222,14 @@ mod tests {
             )
             .input,
             AsRef::<Path>::as_ref("d")
+        );
+        // Verify --force enables the force option.
+        assert!(
+            load_config(
+                &Args::parse_from(["", "--force", "--output=/tmp/out"]),
+                config_dir.path()
+            )
+            .force
         );
     }
 }

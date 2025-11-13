@@ -1,6 +1,7 @@
 use clap::Parser;
 use harvest_translate::cli::{Args, initialize};
 use harvest_translate::transpile;
+use harvest_translate::util::empty_writable_dir;
 use log::{error, info};
 use std::sync::Arc;
 
@@ -17,6 +18,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let Some(config) = initialize(args) else {
         return Ok(()); // An early-exit argument was passed.
     };
+    empty_writable_dir(&config.output, config.force).expect("output directory error");
     let ir = transpile(config)?;
     info!("{}", ir);
     Ok(())

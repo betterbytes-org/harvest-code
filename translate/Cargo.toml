@@ -23,6 +23,7 @@ log = "0.4.28"
 serde = "1.0.228"
 serde_json = "1.0.145"
 tempfile = { workspace = true }
+thiserror = { workspace = true }
 tokio = { features = ["net", "rt"], version = "1.47.1" }
 
 [lints]

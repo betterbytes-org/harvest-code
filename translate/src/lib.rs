@@ -5,6 +5,7 @@ pub mod cli;
 mod runner;
 mod scheduler;
 pub mod tools;
+pub mod util;
 
 #[cfg(test)]
 mod test_util;
