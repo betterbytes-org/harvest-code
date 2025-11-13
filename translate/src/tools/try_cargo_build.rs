@@ -131,7 +131,7 @@ impl Tool for TryCargoBuild {
 
 /// A Representation that contains the results of running `cargo build`.
 pub struct CargoBuildResult {
-    result: Result<Vec<PathBuf>, String>,
+    pub result: Result<Vec<PathBuf>, String>,
 }
 
 impl std::fmt::Display for CargoBuildResult {

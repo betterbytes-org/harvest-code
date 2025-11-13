@@ -1,7 +1,7 @@
-mod cli;
+pub mod cli;
 mod runner;
 mod scheduler;
-mod tools;
+pub mod tools;
 pub mod util;
 
 #[cfg(test)]
