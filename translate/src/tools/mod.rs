@@ -1,3 +1,5 @@
+//! Individual tools (and their interfaces) used by HARVEST to translate C to Rust.
+
 pub mod load_raw_source;
 pub mod raw_source_to_cargo_llm;
 pub mod try_cargo_build;
@@ -9,6 +11,7 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+/// Combined configuration for all Tools in this crate.
 #[derive(Debug, Deserialize)]
 pub struct ToolConfigs {
     pub raw_source_to_cargo_llm: raw_source_to_cargo_llm::Config,
