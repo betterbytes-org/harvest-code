@@ -9,15 +9,14 @@ license = "MIT"
 name = "benchmark"
 path = "src/main.rs"
 
-
 [dependencies]
+clap = { workspace = true }
+csv = "1.3"
 harvest_ir = { workspace = true }
 harvest_translate = { workspace = true }
-clap = { workspace = true }
+log = { workspace = true }
+regex = "1.12.2"
 serde = { workspace = true }
 serde_json = { workspace = true }
-log = { workspace = true }
-walkdir = "2.0"
-csv = "1.3"
-regex = "1.12.2"
 wait-timeout = "0.2"
+walkdir = "2.0"
