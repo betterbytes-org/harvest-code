@@ -48,7 +48,7 @@ impl TranspilationResult {
 }
 
 /// Translates a C source directory to a Rust Cargo project using harvest_translate
-pub async fn translate_c_directory_to_rust_project(
+pub fn translate_c_directory_to_rust_project(
     input_dir: &Path,
     output_dir: &Path,
     config_overrides: &[String],
@@ -87,7 +87,7 @@ pub async fn translate_c_directory_to_rust_project(
 }
 
 /// Run all benchmarks for a list of programs
-pub async fn run_all_benchmarks(
+pub fn run_all_benchmarks(
     program_dirs: &[PathBuf],
     output_dir: &Path,
     config_overrides: &[String],
@@ -102,8 +102,7 @@ pub async fn run_all_benchmarks(
         log::info!("Processing example {} of {}", i + 1, total_examples);
         log::info!("{}", "=".repeat(80));
 
-        let result =
-            benchmark_single_program(program_dir, output_dir, config_overrides, timeout).await;
+        let result = benchmark_single_program(program_dir, output_dir, config_overrides, timeout);
 
         results.push(result);
     }
@@ -112,7 +111,7 @@ pub async fn run_all_benchmarks(
 }
 
 /// Run all benchmarks for a single program
-async fn benchmark_single_program(
+fn benchmark_single_program(
     program_dir: &Path,
     output_root_dir: &Path,
     config_overrides: &[String],
@@ -172,8 +171,7 @@ async fn benchmark_single_program(
 
     // Do the actual translation
     let translation_result =
-        translate_c_directory_to_rust_project(&test_case_src_dir, &output_dir, config_overrides)
-            .await;
+        translate_c_directory_to_rust_project(&test_case_src_dir, &output_dir, config_overrides);
 
     result.translation_success = translation_result.translation_success;
     result.rust_build_success = translation_result.build_success;
@@ -285,8 +283,7 @@ async fn benchmark_single_program(
     result
 }
 
-#[tokio::main]
-async fn main() -> HarvestResult<()> {
+fn main() -> HarvestResult<()> {
     let args = Args::parse();
 
     // Validate input directory exists
@@ -297,10 +294,10 @@ async fn main() -> HarvestResult<()> {
 
     let log_file = File::create(args.output_dir.join("output.log"))?;
     TeeLogger::init(log::LevelFilter::Info, log_file)?;
-    run(args).await
+    run(args)
 }
 
-async fn run(args: Args) -> HarvestResult<()> {
+fn run(args: Args) -> HarvestResult<()> {
     log::info!("Running Benchmarks");
     log::info!("Input directory: {}", args.input_dir.display());
     log::info!("Output directory: {}", args.output_dir.display());
@@ -311,8 +308,7 @@ async fn run(args: Args) -> HarvestResult<()> {
     log_found_programs(&program_dirs, &args.input_dir)?;
 
     // Process all programs
-    let results =
-        run_all_benchmarks(&program_dirs, &args.output_dir, &args.config, args.timeout).await?;
+    let results = run_all_benchmarks(&program_dirs, &args.output_dir, &args.config, args.timeout)?;
     let csv_output_path = args.output_dir.join("results.csv");
     write_csv_results(&csv_output_path, &results)?;
 
