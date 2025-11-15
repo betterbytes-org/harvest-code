@@ -24,10 +24,10 @@ impl ProgramEvalStats {
     /// Calculate success rate as a percentage
     pub fn success_rate(&self) -> f64 {
         if self.total_tests == 0 {
-            0.0
-        } else {
-            (self.passed_tests as f64 / self.total_tests as f64) * 100.0
-        }
+            return 0.0;
+        };
+
+        (self.passed_tests as f64 / self.total_tests as f64) * 100.0
     }
 }
 

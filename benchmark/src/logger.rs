@@ -42,7 +42,6 @@ impl Log for TeeLogger {
     }
 
     fn flush(&self) {
-        use std::io::Write;
         let _ = stdout().flush();
         let _ = self.file.lock().unwrap().flush();
     }

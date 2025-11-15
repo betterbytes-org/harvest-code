@@ -251,18 +251,16 @@ fn benchmark_single_program(
     log::info!("\nResults for {}:", program_name);
     log::info!(
         "  Translation: {}",
-        if result.translation_success {
-            "✅"
-        } else {
-            "❌"
+        match result.translation_success {
+            true => "✅",
+            false => "❌",
         }
     );
     log::info!(
         "  Rust Build: {}",
-        if result.rust_build_success {
-            "✅"
-        } else {
-            "❌"
+        match result.rust_build_success {
+            true => "✅",
+            false => "❌",
         }
     );
     log::info!(

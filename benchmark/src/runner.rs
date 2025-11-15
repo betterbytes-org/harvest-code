@@ -39,29 +39,32 @@ fn write_stdin_to_process(
     stdin_data: Option<&str>,
     binary_path: &Path,
 ) -> HarvestResult<()> {
-    if let Some(data) = stdin_data {
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| -> Box<dyn std::error::Error> {
-                format!(
-                    "Failed to open stdin for process: {}",
-                    binary_path.display()
-                )
-                .into()
-            })?;
-
-        stdin
-            .write_all(data.as_bytes())
-            .map_err(|e| -> Box<dyn std::error::Error> {
-                format!("Failed to write to stdin: {}", e).into()
-            })?;
-    } else {
-        // If no stdin data, just close stdin pipe
+    // Early return if no stdin data - just close the pipe
+    let Some(data) = stdin_data else {
         if let Some(stdin) = child.stdin.take() {
             drop(stdin);
         }
-    }
+        return Ok(());
+    };
+
+    // Get stdin handle or return error
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| -> Box<dyn std::error::Error> {
+            format!(
+                "Failed to open stdin for process: {}",
+                binary_path.display()
+            )
+            .into()
+        })?;
+
+    // Write data to stdin
+    stdin
+        .write_all(data.as_bytes())
+        .map_err(|e| -> Box<dyn std::error::Error> {
+            format!("Failed to write to stdin: {}", e).into()
+        })?;
 
     // stdin is automatically closed when dropped
     Ok(())
