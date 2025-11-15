@@ -114,6 +114,61 @@ pub fn run_all_benchmarks(
     Ok(results)
 }
 
+/// Run list of tests and output result/errors
+fn run_test_validation(
+    binary_path: &Path,
+    test_cases: &[crate::harness::TestCase],
+    timeout: u64,
+    output_dir: &Path,
+) -> (Vec<TestResult>, Vec<String>, usize) {
+    let mut test_results = Vec::new();
+    let mut error_messages = Vec::new();
+    let mut passed_tests = 0;
+
+    log::info!("Validating Rust binary outputs against test cases...");
+
+    for (i, test_case) in test_cases.iter().enumerate() {
+        log::info!(
+            "Running test case {} ({} of {})...",
+            test_case.filename,
+            i + 1,
+            test_cases.len()
+        );
+
+        log::info!(
+            "Validating output for test case with args: {:?} stdin: {:?}",
+            test_case.argv,
+            test_case.stdin,
+        );
+
+        let timeout_opt = Some(timeout);
+        match validate_binary_output(binary_path, test_case, timeout_opt) {
+            Ok(()) => {
+                passed_tests += 1;
+                test_results.push(TestResult {
+                    filename: test_case.filename.clone(),
+                    passed: true,
+                });
+                log::info!("✅ Test case {} passed", test_case.filename);
+            }
+            Err(e) => {
+                test_results.push(TestResult {
+                    filename: test_case.filename.clone(),
+                    passed: false,
+                });
+                let error = format!("Test case {} failed: {}", test_case.filename, e);
+                error_messages.push(error);
+                log::info!("❌ Test case {} failed: {}", test_case.filename, e);
+                test_case
+                    .write_to_disk(output_dir)
+                    .expect("failed to write test case to disk");
+            }
+        }
+    }
+
+    (test_results, error_messages, passed_tests)
+}
+
 /// Run all benchmarks for a single program
 fn benchmark_single_program(
     program_dir: &Path,
@@ -127,17 +182,7 @@ fn benchmark_single_program(
         .to_string_lossy()
         .to_string();
 
-    let mut result = ProgramEvalStats {
-        program_name: program_name.clone(),
-        translation_success: false,
-        rust_build_success: false,
-        total_tests: 0,
-        passed_tests: 0,
-        error_message: None,
-        test_results: Vec::new(),
-    };
-
-    let mut error_messages = Vec::new();
+    let mut result = ProgramEvalStats::new(&program_name);
 
     log::info!("Translating program: {}", program_name);
     log::info!("Input directory: {}", program_dir.display());
@@ -151,7 +196,6 @@ fn benchmark_single_program(
         Ok(dirs) => dirs,
         Err(e) => {
             result.error_message = Some(e.to_string());
-            error_messages.push(e.to_string());
             return result;
         }
     };
@@ -161,7 +205,6 @@ fn benchmark_single_program(
         Ok(vectors) => vectors,
         Err(e) => {
             result.error_message = Some(e.to_string());
-            error_messages.push(e.to_string());
             return result;
         }
     };
@@ -188,7 +231,6 @@ fn benchmark_single_program(
             translation_result.build_error
         );
         result.error_message = Some(error.clone());
-        error_messages.push(error);
         log::info!("❌ Translation failed");
         return result;
     }
@@ -201,72 +243,30 @@ fn benchmark_single_program(
             translation_result.build_error
         );
         result.error_message = Some(error.clone());
-        error_messages.push(error);
         log::info!("❌ Rust build failed");
         return result;
     }
 
     assert!(translation_result.rust_binary_path.exists());
 
-    // Run program against test cases
-    log::info!("Validating Rust binary outputs against test cases...");
-
     // Run validation tests
-    for (i, test_case) in test_cases.iter().enumerate() {
-        log::info!(
-            "Running test case {} ({} of {})...",
-            test_case.filename,
-            i + 1,
-            test_cases.len()
-        );
+    let (test_results, error_messages, passed_tests) = run_test_validation(
+        &translation_result.rust_binary_path,
+        &test_cases,
+        timeout,
+        &output_dir,
+    );
 
-        log::info!(
-            "Validating output for test case with args: {:?} stdin: {:?}",
-            test_case.argv,
-            test_case.stdin,
-        );
-        let timeout_opt = Some(timeout);
-        match validate_binary_output(&translation_result.rust_binary_path, test_case, timeout_opt) {
-            Ok(()) => {
-                result.passed_tests += 1;
-                result.test_results.push(TestResult {
-                    filename: test_case.filename.clone(),
-                    passed: true,
-                });
-                log::info!("✅ Test case {} passed", test_case.filename);
-            }
-            Err(e) => {
-                result.test_results.push(TestResult {
-                    filename: test_case.filename.clone(),
-                    passed: false,
-                });
-                let error = format!("Test case {} failed: {}", test_case.filename, e);
-                error_messages.push(error);
-                log::info!("❌ Test case {} failed: {}", test_case.filename, e);
-                // TODO: write to error file
-                test_case
-                    .write_to_disk(&output_dir)
-                    .expect("failed to write test case to disk");
-            }
-        }
-    }
+    result.test_results = test_results;
+    result.passed_tests = passed_tests;
 
     // Print summary for this example
     log::info!("\nResults for {}:", program_name);
     log::info!(
         "  Translation: {}",
-        match result.translation_success {
-            true => "✅",
-            false => "❌",
-        }
+        status_emoji(result.translation_success)
     );
-    log::info!(
-        "  Rust Build: {}",
-        match result.rust_build_success {
-            true => "✅",
-            false => "❌",
-        }
-    );
+    log::info!("  Rust Build: {}", status_emoji(result.rust_build_success));
     log::info!(
         "  Tests: {}/{} passed ({:.1}%)",
         result.passed_tests,
@@ -330,4 +330,11 @@ fn run(args: Args) -> HarvestResult<()> {
     cleanup_benchmarks(&results, &args.output_dir);
 
     Ok(())
+}
+
+fn status_emoji(success: bool) -> &'static str {
+    match success {
+        true => "✅",
+        false => "❌",
+    }
 }

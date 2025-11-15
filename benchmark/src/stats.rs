@@ -21,6 +21,18 @@ pub struct ProgramEvalStats {
 }
 
 impl ProgramEvalStats {
+    pub fn new(program_name: &str) -> Self {
+        ProgramEvalStats {
+            program_name: program_name.to_string(),
+            translation_success: false,
+            rust_build_success: false,
+            total_tests: 0,
+            passed_tests: 0,
+            error_message: None,
+            test_results: Vec::new(),
+        }
+    }
+
     /// Calculate success rate as a percentage
     pub fn success_rate(&self) -> f64 {
         if self.total_tests == 0 {
