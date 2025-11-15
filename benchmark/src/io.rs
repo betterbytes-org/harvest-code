@@ -1,5 +1,5 @@
 use crate::error::HarvestResult;
-use crate::stats::*;
+use crate::stats::{ProgramEvalStats, SummaryStats};
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};

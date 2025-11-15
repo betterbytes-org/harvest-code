@@ -6,16 +6,20 @@ mod ir_utils;
 mod logger;
 mod runner;
 mod stats;
-use crate::cli::*;
+use crate::cli::Args;
 use crate::error::HarvestResult;
-use crate::harness::*;
-use crate::io::*;
+use crate::harness::{
+    cleanup_benchmarks, parse_benchmark_dir, parse_test_vectors, validate_binary_output,
+};
+use crate::io::{
+    collect_program_dirs, ensure_output_directory, log_failing_programs, log_found_programs,
+    log_summary_stats, validate_input_directory, write_csv_results, write_error_file,
+};
 use crate::ir_utils::{cargo_build_result, raw_cargo_package, raw_source};
 use crate::logger::TeeLogger;
-use crate::stats::*;
+use crate::stats::{ProgramEvalStats, SummaryStats, TestResult};
 use clap::Parser;
 use harvest_ir::HarvestIR;
-use harvest_translate::cli::initialize;
 use harvest_translate::transpile;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -61,7 +65,7 @@ pub fn translate_c_directory_to_rust_project(
         force: false,
     }
     .into();
-    let config = initialize(args).expect("Failed to generate config");
+    let config = harvest_translate::cli::initialize(args).expect("Failed to generate config");
     let tool_config = &config.tools.raw_source_to_cargo_llm;
     log::info!(
         "Translating code using {}:{} with max tokens: {}",
