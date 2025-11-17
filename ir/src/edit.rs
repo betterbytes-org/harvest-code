@@ -1,12 +1,12 @@
-//! A system for organizing concurrent mutations to a [`HarvestIR`].
+//! A system for organizing concurrent mutations to a [HarvestIR].
 
 use crate::{HarvestIR, Id, Representation};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
-/// A tool for organizing concurrent modifications to a `HarvestIR`. This owns the `HarvestIR`,
-/// providing read-only access via `snapshot` and an interface to create and apply `Edits` that
+/// A tool for organizing concurrent modifications to a [HarvestIR]. This owns the `HarvestIR`,
+/// providing read-only access via `snapshot` and an interface to create and apply [Edit]s that
 /// mutate the IR. `Organizer` does not allow two `Edit`s that can modify the same representation
 /// to exist simultaneously.
 #[derive(Default)]
@@ -44,7 +44,7 @@ impl Organizer {
     /// part of the current IR.
     ///
     /// The IDs in `might_write` will be marked as in use, and will only be freed when either the
-    /// edit is applied (via [`apply_edit`]) or dropped.
+    /// edit is applied (via [Organizer::apply_edit]) or dropped.
     pub fn new_edit(&mut self, might_write: &HashSet<Id>) -> Result<Edit, NewEditError> {
         // An unknown ID generally represents a bug in the calling code, whereas IdInUse can be a
         // normal situation. Therefore, prioritize returning UnknownId so that IdInUse doesn't hide
@@ -152,6 +152,7 @@ impl Drop for Edit {
     }
 }
 
+/// Error type returned if you try to modify an ID that this [Edit] cannot write.
 #[derive(Debug, Eq, PartialEq, Error)]
 #[error("cannot write this id")]
 pub struct NotWritable;

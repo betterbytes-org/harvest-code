@@ -1,3 +1,6 @@
+//! The command-line arguments and configuration system for [crate::transpile] and HARVEST's
+//! `translate` binary.
+
 use crate::tools;
 use clap::Parser;
 use config::FileFormat::Toml;
@@ -8,6 +11,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// Command-line arguments for HARVEST's `translate` binary.
 #[derive(Debug, Parser)]
 pub struct Args {
     /// Set a configuration value; format $NAME=$VALUE.
@@ -79,7 +83,7 @@ impl Config {
 ///
 /// This is intended for use by config validation routines. `prefix` should be the path to this
 /// entry (e.g. `tools::Config` should call this with a `prefix` of `tools`).
-pub fn unknown_field_warning(prefix: &str, unknown: &HashMap<String, Value>) {
+pub(crate) fn unknown_field_warning(prefix: &str, unknown: &HashMap<String, Value>) {
     let mut entries: Vec<_> = unknown.keys().collect();
     entries.sort_unstable();
     entries.into_iter().for_each(|name| match prefix {
