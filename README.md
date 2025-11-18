@@ -58,13 +58,20 @@ cargo run -- --print-config-path
 
 ### Translate C code to Rust
 ```bash
-cargo run --release -- /path/to/c/code -o /path/to/output
+cargo run --bin=translate --release -- /path/to/c/code -o /path/to/output
+```
+
+### Running a set of TRACTOR benchmarks
+```bash
+cargo run --bin=benchmark --release -- /path/to/input/dir /path/to/output/dir
+# Example:
+# cargo run --bin=benchmark --release -- Test-Corpus/Public-Tests/B01_synthetic example_output/
 ```
 
 ### Configuration
 Print config file location:
 ```bash
-cargo run -- --print-config-path
+cargo run --bin=translate -- --print-config-path
 ```
 
 You can find more information on configuration in [docs/Configuration.md].
