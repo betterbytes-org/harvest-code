@@ -3,25 +3,25 @@ name = "harvest_translate"
 version = "0.1.0"
 edition = "2024"
 
-[[bin]]
-name = "translate"
-path = "src/main.rs"
-
 [lib]
 name = "harvest_translate"
 path = "src/lib.rs"
 
+[[bin]]
+name = "translate"
+path = "src/main.rs"
+
 [dependencies]
 cargo_metadata = "0.23.0"
-clap = { features = ["derive"], version = "4.5.45" }
+clap = { workspace = true }
 config = { default-features = false, features = ["toml"], version = "0.15.18" }
 directories = "6.0.0"
 env_logger = "0.11.8"
 harvest_ir = { workspace = true }
 llm = { default-features = false, features = ["ollama", "openai", "openrouter", "rustls-tls" ], version = "1.3.4" }
-log = "0.4.28"
-serde = "1.0.228"
-serde_json = "1.0.145"
+log = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { features = ["net", "rt"], version = "1.47.1" }
