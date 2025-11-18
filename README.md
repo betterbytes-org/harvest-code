@@ -59,6 +59,8 @@ cargo run -- --print-config-path
 ### Translate C code to Rust
 ```bash
 cargo run --bin=translate --release -- /path/to/c/code -o /path/to/output
+# Example:
+# cargo run --bin=translate --release -- Test-Corpus/Public-Tests/B01_synthetic/001_helloworld/test_case/ -o example_output/
 ```
 
 ### Running a set of TRACTOR benchmarks
