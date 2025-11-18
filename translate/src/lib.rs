@@ -1,3 +1,6 @@
+//! A framework for translating C code into Rust code. This is normally used through the
+//! `translate` binary, but is exposed as a library crate as well.
+
 pub mod cli;
 mod runner;
 mod scheduler;
@@ -6,8 +9,6 @@ pub mod util;
 
 #[cfg(test)]
 mod test_util;
-
-pub use cli::{Args, initialize};
 
 use crate::load_raw_source::LoadRawSource;
 use crate::tools::raw_source_to_cargo_llm::RawSourceToCargoLlm;

@@ -1,3 +1,6 @@
+//! The Harvest Intermediate Representation ([HarvestIR]), types it depends on (e.g.
+//! [Representation]), and utilities for working with them.
+
 pub mod edit;
 pub mod fs;
 mod id;
