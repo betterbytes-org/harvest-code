@@ -17,11 +17,11 @@ use crate::tools::try_cargo_build::TryCargoBuild;
 use crate::tools::{MightWriteContext, MightWriteOutcome};
 use harvest_ir::HarvestIR;
 use harvest_ir::edit::{self, NewEditError};
-use log::{debug, error, info};
 use runner::{SpawnToolError, ToolRunner};
 use scheduler::Scheduler;
 use std::sync::Arc;
 use tools::load_raw_source;
+use tracing::{debug, error, info};
 
 /// Performs the complete transpilation process using the scheduler.
 pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std::error::Error>> {
@@ -57,17 +57,12 @@ pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std
                 might_write,
                 config.clone(),
             ) {
-                Err(SpawnToolError {
-                    cause: NewEditError::IdInUse,
-                    tool,
-                }) => {
+                Err((SpawnToolError::CollectorDropped(_), _)) => panic!("collector dropped?"),
+                Err((SpawnToolError::NewEdit(NewEditError::IdInUse), tool)) => {
                     debug!("Not spawning {name} because an ID it needs is in use.");
                     Some(tool)
                 }
-                Err(SpawnToolError {
-                    cause: NewEditError::UnknownId,
-                    tool: _,
-                }) => {
+                Err((SpawnToolError::NewEdit(NewEditError::UnknownId), _)) => {
                     error!("Tool {name}: might_write returned an unknown ID");
                     None
                 }

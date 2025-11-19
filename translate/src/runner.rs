@@ -1,14 +1,16 @@
-use crate::diagnostics::Reporter;
+use crate::diagnostics::{CollectorDropped, Reporter};
 use crate::tools::{RunContext, Tool};
 use harvest_ir::edit::{self, NewEditError};
 use harvest_ir::{Edit, HarvestIR, Id};
 use std::collections::{HashMap, HashSet};
-use std::fmt::{self, Debug, Formatter};
+use std::fmt::Debug;
 use std::iter::once;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread::{self, JoinHandle, ThreadId, spawn};
+use thiserror::Error;
+use tracing::error;
 
 /// Spawns off each tool execution in its own thread, and keeps track of those threads.
 pub struct ToolRunner {
@@ -60,7 +62,7 @@ impl ToolRunner {
                 continue;
             };
             if let Err(error) = edit_organizer.apply_edit(edit) {
-                log::error!("Edit application error: {error:?}");
+                error!("Edit application error: {error:?}");
                 continue;
             }
             self.ir_version += 1;
@@ -78,13 +80,18 @@ impl ToolRunner {
         ir_snapshot: Arc<HarvestIR>,
         might_write: HashSet<Id>,
         config: Arc<crate::cli::Config>,
-    ) -> Result<(), SpawnToolError> {
+    ) -> Result<(), (SpawnToolError, Box<dyn Tool>)> {
         let mut edit = match edit_organizer.new_edit(&might_write) {
-            Err(error) => return Err(SpawnToolError { cause: error, tool }),
+            Err(error) => return Err((error.into(), tool)),
             Ok(edit) => edit,
+        };
+        let reporter = match self.reporter.start_tool_run(&*tool) {
+            Err(error) => return Err((error.into(), tool)),
+            Ok(reporter) => reporter,
         };
         let sender = self.sender.clone();
         let join_handle = spawn(move || {
+            reporter.set_thread_logger();
             // Tool::run is not necessarily unwind safe, which means that if it panics it might
             // leave shared data in a state that violates invariants. Types that are shared between
             // threads can generally handle this (e.g. Mutex and RwLock have poisoning), but
@@ -104,11 +111,11 @@ impl ToolRunner {
             // TODO: Diagnostics module.
             match result {
                 Err(panic_error) => {
-                    log::error!("Tool panicked: {panic_error:?}");
+                    error!("Tool panicked: {panic_error:?}");
                     Err(())
                 }
                 Ok(Err(tool_error)) => {
-                    log::error!("Tool invocation failed: {tool_error}");
+                    error!("Tool invocation failed: {tool_error}");
                     Err(())
                 }
                 Ok(Ok(edit)) => Ok(edit),
@@ -121,15 +128,12 @@ impl ToolRunner {
 }
 
 /// An error returned from spawn_tool.
-pub struct SpawnToolError {
-    pub cause: NewEditError,
-    pub tool: Box<dyn Tool>,
-}
-
-impl Debug for SpawnToolError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}", self.cause)
-    }
+#[derive(Debug, Error)]
+pub enum SpawnToolError {
+    #[error("diagnostics collector dropped")]
+    CollectorDropped(#[from] CollectorDropped),
+    #[error("failed to create Edit")]
+    NewEdit(#[from] NewEditError),
 }
 
 /// Data the ToolRunner tracks for each currently-running thread. These are accessed from the main

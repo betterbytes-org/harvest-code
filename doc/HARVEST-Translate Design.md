@@ -90,9 +90,10 @@ following subdirectories:
   be extended as necessary to keep them all the same size). The second revision
   (after the second tool invocation) will be `0002`, etc.
 * `steps/` Contains a subdirectory for each tool invocation. The name of each
-  subdirectory is the same as the name of the IR revision immediately after that
-  tool finishes. As a result, `0000` will be skipped and the subdirectory
-  numbers will start at `0001`. Each subdirectory will contain:
+  subdirectory is `$tool_$number`, where `$number` is the number of times that
+  particular tool has been run (for example, the first run of the
+  `try_cargo_build` tool will have subdirectory name `try_cargo_build_1`). Each
+  subdirectory will contain:
   - `start_ir` A symlink to the IR revision the tool was launched with (i.e.
     links to `../../ir/####`).
   - `end_ir` A symlink to the IR revision the tool was completed with.

@@ -60,6 +60,10 @@ pub struct Config {
     /// If false: if the directory exists and is nonempty, translate will output an error and exit.
     pub force: bool,
 
+    /// Filter describing which log messages should be output to stdout. This is in the
+    /// `tracing_subscriber::filter::EnvFilter` format.
+    pub log_filter: String,
+
     /// Sub-configuration for each tool.
     pub tools: tools::ToolConfigs,
 
@@ -79,6 +83,7 @@ impl Config {
             output: PathBuf::from("mock_output"),
             diagnostics_dir: None,
             force: false,
+            log_filter: String::new(),
             tools: tools::ToolConfigs::mock(),
             unknown: HashMap::new(),
         }
@@ -103,7 +108,7 @@ pub(crate) fn unknown_field_warning(prefix: &str, unknown: &HashMap<String, Valu
 ///
 /// Returns the config, or None if a command line flag that calls for an early exit (such as
 /// --print_config_path) was provided.
-pub fn initialize(args: Arc<Args>) -> Option<Arc<Config>> {
+pub fn initialize(args: Arc<Args>) -> Option<Config> {
     let dirs = ProjectDirs::from("", "", "harvest").expect("no home directory");
     if args.print_config_path {
         println!("Config file location: {:?}", config_file(dirs.config_dir()));
@@ -112,7 +117,7 @@ pub fn initialize(args: Arc<Args>) -> Option<Arc<Config>> {
     let config = load_config(&args, dirs.config_dir());
     unknown_field_warning("", &config.unknown);
     config.tools.validate();
-    Some(config.into())
+    Some(config)
 }
 
 fn load_config(args: &Args, config_dir: &Path) -> Config {

@@ -7,17 +7,28 @@
 //! This module also provides directories for tools to use, as those directories live under the
 //! diagnostic directory.
 
+mod tool_reporter;
+
 use crate::cli::Config;
+use crate::tools::Tool;
 use crate::util::{EmptyDirError, empty_writable_dir};
 use harvest_ir::HarvestIR;
-use log::error;
-use std::fmt::Write as _;
-use std::fs::{canonicalize, create_dir, write};
-use std::io;
+use std::collections::HashMap;
+use std::fmt::{Arguments, Write as _};
+use std::fs::{File, canonicalize, create_dir, write};
+use std::io::{self, IoSlice, Write};
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 use tempfile::{TempDir, tempdir};
 use thiserror::Error;
+use tool_reporter::{ToolId, ToolRunId, RunShared};
+use tracing::{dispatcher::DefaultGuard, error, subscriber};
+use tracing_subscriber::{Layer as _, EnvFilter, Registry};
+use tracing_subscriber::fmt::{MakeWriter, layer};
+use tracing_subscriber::layer::SubscriberExt as _;
+
+pub use tool_reporter::ToolReporter;
 
 /// Diagnostics produced by transpilation. Can be used by callers of `transpile` to inspect the
 /// diagnostics produced during its execution.
@@ -37,10 +48,10 @@ pub struct Diagnostics {
 // TODO: Implement collecting `tracing` events.
 pub(crate) struct Collector {
     shared: Arc<Mutex<Option<Shared>>>,
-    // If no diagnostics directory has been configured, Collector will use a temporary directory
-    // instead (as tools still need to be able to create temporary files). In that case, the
-    // TempDir will be stored here so the directory is cleaned up when Collector is dropped.
+
+    // Guards that clean up values on drop.
     _tempdir: Option<TempDir>,
+    _tracing_dispatcher: DefaultGuard,
 }
 
 impl Collector {
@@ -64,12 +75,32 @@ impl Collector {
             diagnostics_dir.as_path(),
             "ir".as_ref(),
         ]))?;
+        let messages_file = SharedWriter(Arc::new(Mutex::new(
+            File::options()
+                .append(true)
+                .create_new(true)
+                .open(PathBuf::from_iter([
+                    diagnostics_dir.as_path(),
+                    "messages".as_ref(),
+                ]))?,
+        )));
+        let console_filter = EnvFilter::builder().parse(&config.log_filter)?;
+        let _tracing_dispatcher = subscriber::set_default(
+            Registry::default()
+                .with(layer().with_ansi(false).with_writer(messages_file.clone()))
+                .with(layer().with_filter(console_filter.clone())),
+        );
         Ok(Collector {
             shared: Arc::new(Mutex::new(Some(Shared {
+                console_filter,
                 diagnostics: Diagnostics {},
                 diagnostics_dir,
+                messages_file,
+                run_shared: HashMap::new(),
+                tool_run_counts: HashMap::new(),
             }))),
             _tempdir,
+            _tracing_dispatcher,
         })
     }
 
@@ -100,7 +131,7 @@ pub(crate) struct Reporter {
 impl Reporter {
     /// Reports a new version of the IR.
     pub fn report_ir_version(&self, version: u64, snapshot: &HarvestIR) {
-        let Some(ref mut shared) = *lock_shared(&self.shared) else {
+        let Some(ref shared) = *lock_shared(&self.shared) else {
             return;
         };
         let mut path = shared.diagnostics_dir.clone();
@@ -133,6 +164,11 @@ impl Reporter {
             error!("Failed to write IR index: {error}");
         }
     }
+
+    /// Reports the start of a tool's execution and returns a new [ToolReporter] for the tool.
+    pub(crate) fn start_tool_run(&self, tool: &dyn Tool) -> Result<ToolReporter, CollectorDropped> {
+        ToolReporter::new(self.shared.clone(), tool)
+    }
 }
 
 /// Error type returned by Collector::new.
@@ -142,7 +178,16 @@ pub(crate) enum CollectorNewError {
     DiagnosticsEmptyDir(#[from] EmptyDirError),
     #[error("I/O error")]
     IoError(#[from] io::Error),
+    #[error("invalid RUST_LOG filter")]
+    LogFilterError(#[from] tracing_subscriber::filter::ParseError),
 }
+
+/// Some functions can only be called while diagnostics are being collected (the [Collector] is
+/// still alive). This is the error return if one of those functions is called while diagnostics
+/// are not being collected.
+#[derive(Debug, Error)]
+#[error("diagnostics::Collector already dropped")]
+pub(crate) struct CollectorDropped;
 
 /// Utility to lock one of the `Shared` references, logging an error if it is poisoned (and
 /// unpoisoning it).
@@ -161,7 +206,59 @@ fn lock_shared<'m>(shared: &'m Mutex<Option<Shared>>) -> MutexGuard<'m, Option<S
 /// which is set to `None` when [Collector::diagnostics] is called (and must remain Some() until
 /// then).
 struct Shared {
+    console_filter: EnvFilter,
     diagnostics: Diagnostics,
     // Path to the root of the diagnostics directory structure.
     diagnostics_dir: PathBuf,
+
+    messages_file: SharedWriter<File>,
+    run_shared: HashMap<ToolRunId, RunShared>,
+
+    // The number of times each tool has been run. Tools that have not been run yet will not be
+    // present in this map. This is incremented when a tool run starts, not when it ends.
+    tool_run_counts: HashMap<ToolId, NonZeroU64>,
+}
+
+/// MakeWriter is not implemented for Arc<Mutex<_>>
+/// (https://github.com/tokio-rs/tracing/issues/2687). This works around that by wrapping
+/// Arc<Mutex<_>>.
+struct SharedWriter<W: Write>(pub Arc<Mutex<W>>);
+
+impl<W: Write> Clone for SharedWriter<W> {
+    fn clone(&self) -> SharedWriter<W> {
+        SharedWriter(self.0.clone())
+    }
+}
+
+impl<'l, W: Write + 'l> MakeWriter<'l> for SharedWriter<W> {
+    type Writer = MutexGuardWriter<'l, W>;
+    fn make_writer(&'l self) -> MutexGuardWriter<'l, W> {
+        MutexGuardWriter(match self.0.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                self.0.clear_poison();
+                poisoned.into_inner()
+            }
+        })
+    }
+}
+
+struct MutexGuardWriter<'l, W: Write>(MutexGuard<'l, W>);
+
+impl<W: Write> Write for MutexGuardWriter<'_, W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0.write(buf)
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.flush()
+    }
+    fn write_vectored(&mut self, bufs: &[IoSlice]) -> io::Result<usize> {
+        self.0.write_vectored(bufs)
+    }
+    fn write_all(&mut self, buf: &[u8]) -> io::Result<()> {
+        self.0.write_all(buf)
+    }
+    fn write_fmt(&mut self, args: Arguments) -> io::Result<()> {
+        self.0.write_fmt(args)
+    }
 }

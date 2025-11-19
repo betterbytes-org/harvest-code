@@ -4,8 +4,8 @@
 //! for invoking them.
 
 use crate::tools::Tool;
-use log::debug;
 use std::mem::replace;
+use tracing::debug;
 
 #[derive(Default)]
 pub struct Scheduler {
