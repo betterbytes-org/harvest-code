@@ -86,9 +86,9 @@ The diagnostic output is emitted to a directory. It will have at least the
 following subdirectories:
 
 * `ir/` Contains all the revisions of the HARVEST-IR. The first revision
-  (after the input project is loaded) will be named `0000` (field width to be
-  extended as necessary to keep them all the same size). The second revision
-  (after the first tool invocation) will be `0001`, etc.
+  (after the first tool completes running) will be named `0001` (field width to
+  be extended as necessary to keep them all the same size). The second revision
+  (after the second tool invocation) will be `0002`, etc.
 * `steps/` Contains a subdirectory for each tool invocation. The name of each
   subdirectory is the same as the name of the IR revision immediately after that
   tool finishes. As a result, `0000` will be skipped and the subdirectory

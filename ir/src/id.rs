@@ -45,6 +45,12 @@ impl Display for Id {
     }
 }
 
+impl From<Id> for u64 {
+    fn from(value: Id) -> u64 {
+        value.0.into()
+    }
+}
+
 // `Id::new_array`, but with an injected AtomicU64. This allows `tests::new` to
 // use its own AtomicU64, which prevents other tests that are run in parallel
 // from interfering with it.
