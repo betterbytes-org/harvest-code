@@ -1,6 +1,7 @@
 # The default configurations options for harvest_translate.
 
 force = false
+log_filter = "info"
 
 [tools.raw_source_to_cargo_llm]
 address = "http://localhost:11434"

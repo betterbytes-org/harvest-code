@@ -5,6 +5,7 @@ use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use harvest_ir::{HarvestIR, Representation, fs::RawDir};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tracing::info;
 
 pub struct TryCargoBuild;
 // Either a vector of compiled artifact filenames (on success)
@@ -49,7 +50,7 @@ fn parse_compiled_artifacts(stdout: &[u8]) -> Result<Vec<PathBuf>, Box<dyn std::
 /// - If the project fails to build, it returns Ok(Err(error_message)).
 /// - If there is an error running cargo, it returns Err.
 fn try_cargo_build(project_path: &PathBuf) -> Result<BuildResult, Box<dyn std::error::Error>> {
-    log::info!("Validating that the generated Rust project builds...");
+    info!("Validating that the generated Rust project builds...");
 
     // Run cargo build in the project directory
     let output = Command::new("cargo")
@@ -67,7 +68,7 @@ fn try_cargo_build(project_path: &PathBuf) -> Result<BuildResult, Box<dyn std::e
         })?;
 
     if output.status.success() {
-        log::info!("Project builds successfully!");
+        info!("Project builds successfully!");
         let artifact_filenames = parse_compiled_artifacts(&output.stdout)?;
         Ok(Ok(artifact_filenames))
     } else {
@@ -151,7 +152,7 @@ impl std::fmt::Display for CargoBuildResult {
 
 impl Representation for CargoBuildResult {
     fn name(&self) -> &'static str {
-        "CargoBuildResult"
+        "cargo_build_result"
     }
 
     fn materialize(&self, _path: &Path) -> std::io::Result<()> {
