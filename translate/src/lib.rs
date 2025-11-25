@@ -84,6 +84,8 @@ pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std
             break;
         }
     }
+    drop(scheduler);
+    drop(runner);
     collector.diagnostics(); // TODO: Return this value (see issue 51)
     Ok(ir_organizer.snapshot())
 }
