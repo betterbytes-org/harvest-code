@@ -99,7 +99,7 @@ fn raw_cargo_package(ir: &HarvestIR) -> Result<&RawDir, Box<dyn std::error::Erro
 
 impl Tool for TryCargoBuild {
     fn name(&self) -> &'static str {
-        "TryCargoBuild"
+        "try_cargo_build"
     }
 
     fn might_write(&mut self, context: MightWriteContext) -> MightWriteOutcome {
