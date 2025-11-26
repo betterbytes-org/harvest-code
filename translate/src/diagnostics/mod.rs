@@ -7,19 +7,28 @@
 //! This module also provides directories for tools to use, as those directories live under the
 //! diagnostic directory.
 
+mod tool_reporter;
+
 use crate::cli::Config;
+use crate::tools::Tool;
 use crate::util::{EmptyDirError, empty_writable_dir};
 use harvest_ir::HarvestIR;
 use log::{error, info};
+use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs::{canonicalize, create_dir, write};
 use std::io;
 use std::mem::replace;
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex, MutexGuard};
 use tempfile::{TempDir, tempdir};
 use thiserror::Error;
+use tool_reporter::ToolId;
+
+pub(crate) use tool_reporter::ToolJoiner;
+pub use tool_reporter::ToolReporter;
 
 /// Diagnostics produced by transpilation. Can be used by callers of `transpile` to inspect the
 /// diagnostics produced during its execution.
@@ -75,6 +84,10 @@ impl Collector {
             diagnostics_dir.as_path(),
             "ir".as_ref(),
         ]))?;
+        create_dir(PathBuf::from_iter([
+            diagnostics_dir.as_path(),
+            "steps".as_ref(),
+        ]))?;
         let (diagnostics_sender, diagnostics_receiver) = channel();
         Ok(Collector {
             diagnostics_receiver,
@@ -82,6 +95,7 @@ impl Collector {
                 diagnostics: Diagnostics::new(),
                 diagnostics_dir,
                 diagnostics_sender,
+                tool_run_counts: HashMap::new(),
             })),
             _tempdir,
         })
@@ -147,6 +161,11 @@ impl Reporter {
             error!("Failed to write IR index: {error}");
         }
     }
+
+    /// Reports the start of a tool's execution.
+    pub(crate) fn start_tool_run(&self, tool: &dyn Tool) -> (ToolJoiner, ToolReporter) {
+        ToolReporter::new(self.shared.clone(), tool)
+    }
 }
 
 /// Error type returned by Collector::new.
@@ -180,6 +199,10 @@ struct Shared {
     diagnostics_dir: PathBuf,
     // Channel to send the Diagnostics to the Collector when this Shared is dropped.
     diagnostics_sender: Sender<Diagnostics>,
+
+    // The number of times each tool has been run. Tools that have not been run yet will not be
+    // present in this map. This is incremented when a tool run starts, not when it ends.
+    tool_run_counts: HashMap<ToolId, NonZeroU64>,
 }
 
 impl Drop for Shared {

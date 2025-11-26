@@ -5,7 +5,7 @@ pub mod load_raw_source;
 pub mod raw_source_to_cargo_llm;
 pub mod try_cargo_build;
 
-use crate::cli::unknown_field_warning;
+use crate::{cli::unknown_field_warning, diagnostics::ToolReporter};
 use harvest_ir::{Edit, HarvestIR, Id};
 use serde::Deserialize;
 use serde_json::Value;
@@ -106,4 +106,8 @@ pub struct RunContext<'a> {
 
     /// Configuration for the current harvest_translate run.
     pub config: Arc<crate::cli::Config>,
+
+    /// Handle through which to report diagnostics and create temporary directories (which live
+    /// inside the diagnostics directory).
+    pub reporter: ToolReporter,
 }

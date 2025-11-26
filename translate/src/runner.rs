@@ -84,7 +84,9 @@ impl ToolRunner {
             Ok(edit) => edit,
         };
         let sender = self.sender.clone();
+        let (tool_joiner, tool_reporter) = self.reporter.start_tool_run(&*tool);
         let join_handle = spawn(move || {
+            let logger = tool_reporter.setup_thread_logger();
             // Tool::run is not necessarily unwind safe, which means that if it panics it might
             // leave shared data in a state that violates invariants. Types that are shared between
             // threads can generally handle this (e.g. Mutex and RwLock have poisoning), but
@@ -97,12 +99,12 @@ impl ToolRunner {
                     ir_edit: &mut edit,
                     ir_snapshot,
                     config,
+                    reporter: tool_reporter,
                 })
                 .map(|_| edit)
             }));
-            let _ = sender.send(thread::current().id());
             // TODO: Diagnostics module.
-            match result {
+            let out = match result {
                 Err(panic_error) => {
                     log::error!("Tool panicked: {panic_error:?}");
                     Err(())
@@ -112,7 +114,10 @@ impl ToolRunner {
                     Err(())
                 }
                 Ok(Ok(edit)) => Ok(edit),
-            }
+            };
+            tool_joiner.join(logger);
+            let _ = sender.send(thread::current().id());
+            out
         });
         self.invocations
             .insert(join_handle.thread().id(), RunningInvocation { join_handle });
