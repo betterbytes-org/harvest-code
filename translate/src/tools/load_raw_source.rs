@@ -4,6 +4,7 @@ use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use harvest_ir::{Representation, fs::RawDir};
 use std::fs::read_dir;
 use std::path::{Path, PathBuf};
+use tracing::info;
 
 pub struct LoadRawSource {
     directory: PathBuf,
@@ -31,7 +32,7 @@ impl Tool for LoadRawSource {
     fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
         let dir = read_dir(self.directory.clone())?;
         let (rawdir, directories, files) = RawDir::populate_from(dir)?;
-        log::info!(
+        info!(
             "Loaded {directories} directories and {files} files from {}.",
             self.directory.display()
         );
