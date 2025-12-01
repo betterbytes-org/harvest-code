@@ -132,6 +132,28 @@ impl RawDir {
         out
     }
 
+    pub fn get_file<P: AsRef<Path>>(&self, path: P) -> Option<&Vec<u8>> {
+        let file_name = path.as_ref().file_name()?;
+
+        let mut cur_dir = self;
+        for component in path.as_ref().parent()?.components() {
+            if let Component::Normal(component_str) = component
+                && let RawEntry::Dir(rd) = cur_dir.0.get(component_str)?
+            {
+                cur_dir = rd;
+            } else {
+                return None;
+            }
+        }
+        cur_dir.0.get(file_name).and_then(|r| {
+            if let RawEntry::File(v) = r {
+                Some(v)
+            } else {
+                None
+            }
+        })
+    }
+
     /// Creates a new file at the given path. The file must not already exist. On success, returns
     /// a reference to the newly-added file.
     ///
