@@ -4,7 +4,7 @@
 use crate::cli::unknown_field_warning;
 use crate::load_raw_source::RawSource;
 use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
-use harvest_ir::{HarvestIR, Representation, fs::RawDir};
+use harvest_ir::{Representation, fs::RawDir};
 use llm::builder::{LLMBackend, LLMBuilder};
 use llm::chat::{ChatMessage, StructuredOutputFormat};
 use serde::{Deserialize, Serialize};
@@ -13,10 +13,13 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
+use super::identify_project_kind::ProjectKind;
+
 /// Structured output JSON schema for Ollama.
 const STRUCTURED_OUTPUT_SCHEMA: &str = include_str!("structured_schema.json");
 
-const SYSTEM_PROMPT: &str = include_str!("system_prompt.txt");
+const SYSTEM_PROMPT_EXECUTABLE: &str = include_str!("system_prompt_executable.txt");
+const SYSTEM_PROMPT_LIBRARY: &str = include_str!("system_prompt_library.txt");
 
 pub struct RawSourceToCargoLlm;
 
@@ -27,7 +30,12 @@ impl Tool for RawSourceToCargoLlm {
 
     fn might_write(&mut self, context: MightWriteContext) -> MightWriteOutcome {
         // We need a raw_source to be available, but we won't write any existing IDs.
-        match raw_source(context.ir) {
+        match context
+            .ir
+            .get_by_representation::<ProjectKind>()
+            .zip(context.ir.get_by_representation::<RawSource>())
+            .next()
+        {
             None => MightWriteOutcome::TryAgain,
             Some(_) => MightWriteOutcome::Runnable([].into()),
         }
@@ -36,7 +44,19 @@ impl Tool for RawSourceToCargoLlm {
     fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
         let config = &context.config.tools.raw_source_to_cargo_llm;
         log::debug!("LLM Configuration {config:?}");
-        let in_dir = raw_source(&context.ir_snapshot).unwrap();
+        let in_dir = &context
+            .ir_snapshot
+            .get_by_representation::<RawSource>()
+            .next()
+            .unwrap()
+            .1
+            .dir;
+        let project_kind = context
+            .ir_snapshot
+            .get_by_representation::<ProjectKind>()
+            .next()
+            .unwrap()
+            .1;
 
         // Use the llm crate to connect to Ollama.
 
@@ -58,8 +78,16 @@ impl Tool for RawSourceToCargoLlm {
                 .model(&config.model)
                 .max_tokens(config.max_tokens)
                 .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
-                .schema(output_format)
-                .system(SYSTEM_PROMPT);
+                .schema(output_format);
+
+            match project_kind {
+                ProjectKind::Executable => {
+                    llm_builder = llm_builder.system(SYSTEM_PROMPT_EXECUTABLE);
+                }
+                ProjectKind::Library => {
+                    llm_builder = llm_builder.system(SYSTEM_PROMPT_LIBRARY);
+                }
+            }
 
             if let Some(ref address) = config.address
                 && !address.is_empty()
@@ -109,8 +137,11 @@ impl Tool for RawSourceToCargoLlm {
         struct OutputFiles {
             files: Vec<OutputFile>,
         }
+        let response = response.strip_prefix("```").unwrap_or(&response);
+        let response = response.strip_prefix("json").unwrap_or(response);
+        let response = response.strip_suffix("```").unwrap_or(response);
         log::trace!("LLM responded: {:?}", &response);
-        let files: OutputFiles = serde_json::from_str(&response)?;
+        let files: OutputFiles = serde_json::from_str(response)?;
         log::info!("LLM response contains {} files.", files.files.len());
         let mut out_dir = RawDir::default();
         for file in files.files {
@@ -191,14 +222,6 @@ impl Config {
             unknown: HashMap::new(),
         }
     }
-}
-
-/// Returns the RawSource representation in IR. If there are multiple RawSource representations,
-/// returns an arbitrary one.
-fn raw_source(ir: &HarvestIR) -> Option<&RawDir> {
-    ir.get_by_representation::<RawSource>()
-        .next()
-        .map(|(_, r)| &r.dir)
 }
 
 /// Structure representing a file created by the LLM.

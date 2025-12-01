@@ -21,6 +21,7 @@ use log::{debug, error, info};
 use runner::{SpawnToolError, ToolRunner};
 use scheduler::Scheduler;
 use std::sync::Arc;
+use tools::identify_project_kind::IdentifyProjectKind;
 use tools::load_raw_source;
 
 /// Performs the complete transpilation process using the scheduler.
@@ -30,6 +31,7 @@ pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std
     let mut runner = ToolRunner::new(collector.reporter());
     let mut scheduler = Scheduler::default();
     scheduler.queue_invocation(LoadRawSource::new(&config.input));
+    scheduler.queue_invocation(IdentifyProjectKind);
     scheduler.queue_invocation(RawSourceToCargoLlm);
     scheduler.queue_invocation(TryCargoBuild);
     loop {
