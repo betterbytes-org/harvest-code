@@ -29,9 +29,14 @@ pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std
     let mut ir_organizer = edit::Organizer::default();
     let mut runner = ToolRunner::new(collector.reporter());
     let mut scheduler = Scheduler::default();
+    let mut previous_errors = vec![];
+    let llm: Arc<dyn llm::LLMProvider> = Arc::from(tools::raw_source_to_cargo_llm::build_llm(
+        &config.tools.raw_source_to_cargo_llm,
+    )?);
     scheduler.queue_invocation(LoadRawSource::new(&config.input));
-    scheduler.queue_invocation(RawSourceToCargoLlm);
+    scheduler.queue_invocation(RawSourceToCargoLlm::new(llm.clone(), &previous_errors));
     scheduler.queue_invocation(TryCargoBuild);
+    let mut retries_left = config.retries;
     loop {
         let snapshot = ir_organizer.snapshot();
         scheduler.next_invocations(|mut tool| {
@@ -78,6 +83,26 @@ pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std
             }
         });
         if !runner.process_tool_results(&mut ir_organizer) {
+            let ir = ir_organizer.snapshot();
+            let latest_build_result = ir
+                .get_by_representation::<tools::try_cargo_build::CargoBuildResult>()
+                .map(|(_, r)| &r.result)
+                .last()
+                .unwrap();
+
+            if let Err(compiler_err) = latest_build_result {
+                // Next, need to thread compiler message back to llm
+                if retries_left > 0 {
+                    retries_left -= 1;
+                    debug!("Build failed; retrying. {} retries left.", retries_left);
+                    previous_errors.push(compiler_err.clone());
+                    scheduler
+                        .queue_invocation(RawSourceToCargoLlm::new(llm.clone(), &previous_errors));
+                    scheduler.queue_invocation(TryCargoBuild);
+                    continue;
+                }
+            }
+
             // No tools are running now, which also indicates that no tools are schedulable.
             // Eventually we need some way to determine whether this is a successful outcome or a
             // failure, but for now we can just assume success.
