@@ -49,7 +49,7 @@ impl Tool for IdentifyProjectKind {
 
     fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
         for (_, repr) in context.ir_snapshot.get_by_representation::<RawSource>() {
-            if let Some(cmakelists) = repr.dir.get_file("CMakeLists.txt") {
+            if let Ok(cmakelists) = repr.dir.get_file("CMakeLists.txt") {
                 if String::from_utf8_lossy(cmakelists)
                     .lines()
                     .any(|line| line.starts_with("add_executable("))

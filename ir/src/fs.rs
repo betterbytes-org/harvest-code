@@ -132,26 +132,59 @@ impl RawDir {
         out
     }
 
-    pub fn get_file<P: AsRef<Path>>(&self, path: P) -> Option<&Vec<u8>> {
-        let file_name = path.as_ref().file_name()?;
+    /// Gets the contents of a file at the given path. The file must
+    /// exist. On success, returns a reference to file's contents.
+    ///
+    /// `path` must be a relative path. `..` is resolved lexically: it
+    /// just removes the previously-specified directory (in general
+    /// this isn't correct in the presence of symlinks, but `RawDir`
+    /// does not support symlinks).
+    pub fn get_file<P: AsRef<Path>>(&self, path: P) -> Result<&Vec<u8>, GetFileError> {
+        // Determine which directories we need to descend into to reach the file (handling normal
+        // directory names as well as . and ..), and split out the file name.
+        let mut segments = vec![];
+        // Whether the most-recently-processed entry can be a file.
+        let mut last_can_be_file = true;
+        for component in path.as_ref().components() {
+            last_can_be_file = match component {
+                Component::CurDir => false,
+                Component::Normal(name) => {
+                    segments.push(name);
+                    true
+                }
+                Component::ParentDir => {
+                    if segments.pop().is_none() {
+                        return Err(GetFileError::OutsideDir);
+                    }
+                    false
+                }
+                Component::Prefix(_) | Component::RootDir => {
+                    return Err(GetFileError::AbsolutePath);
+                }
+            };
+        }
+        if !last_can_be_file {
+            return Err(GetFileError::Directory);
+        }
+        let file_name = match segments.pop() {
+            None => return Err(GetFileError::DoesNotExist),
+            Some(empty) if empty.is_empty() => return Err(GetFileError::DoesNotExist),
+            Some(name) => name.into(),
+        };
 
         let mut cur_dir = self;
-        for component in path.as_ref().parent()?.components() {
-            if let Component::Normal(component_str) = component
-                && let RawEntry::Dir(rd) = cur_dir.0.get(component_str)?
-            {
+        for component in segments {
+            if let RawEntry::Dir(rd) = cur_dir.0.get(component).ok_or(GetFileError::DoesNotExist)? {
                 cur_dir = rd;
             } else {
-                return None;
+                return Err(GetFileError::UnderFile);
             }
         }
-        cur_dir.0.get(file_name).and_then(|r| {
-            if let RawEntry::File(v) = r {
-                Some(v)
-            } else {
-                None
-            }
-        })
+        if let RawEntry::File(v) = cur_dir.0.get(file_name).ok_or(GetFileError::DoesNotExist)? {
+            Ok(v)
+        } else {
+            Err(GetFileError::Directory)
+        }
     }
 
     /// Creates a new file at the given path. The file must not already exist. On success, returns
@@ -252,6 +285,21 @@ pub enum SetFileError {
     OutsideDir,
     #[error("tried to set a file that is under another file")]
     UnderFile,
+}
+
+/// Error type returned by [RawDir::get_file].
+#[derive(Debug, Eq, Hash, PartialEq, thiserror::Error)]
+pub enum GetFileError {
+    #[error("tried to get file at absolute path")]
+    AbsolutePath,
+    #[error("tried to get file at directory path")]
+    Directory,
+    #[error("tried to get a file outside this directory")]
+    OutsideDir,
+    #[error("tried to get a file that is under another file")]
+    UnderFile,
+    #[error("tried to get a file that does not exist")]
+    DoesNotExist,
 }
 
 #[cfg(test)]
