@@ -10,11 +10,13 @@
 use crate::cli::Config;
 use crate::util::{EmptyDirError, empty_writable_dir};
 use harvest_ir::HarvestIR;
-use log::error;
+use log::{error, info};
 use std::fmt::Write as _;
 use std::fs::{canonicalize, create_dir, write};
 use std::io;
+use std::mem::replace;
 use std::path::PathBuf;
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex, MutexGuard};
 use tempfile::{TempDir, tempdir};
 use thiserror::Error;
@@ -31,12 +33,21 @@ pub struct Diagnostics {
     // Option<TempDir> from `Collector` into here.
 }
 
+impl Diagnostics {
+    fn new() -> Diagnostics {
+        Diagnostics {}
+    }
+}
+
 /// Component that collects diagnostics during the execution of `transpile`. Creating a Collector
 /// will start collecting `tracing` events (writing them into log files and echoing some events to
 /// stdout).
 // TODO: Implement collecting `tracing` events.
 pub(crate) struct Collector {
-    shared: Arc<Mutex<Option<Shared>>>,
+    // When the Shared is destructed, the Diagnostics will be sent to this Collector through this
+    // receiver.
+    diagnostics_receiver: Receiver<Diagnostics>,
+    shared: Arc<Mutex<Shared>>,
     // If no diagnostics directory has been configured, Collector will use a temporary directory
     // instead (as tools still need to be able to create temporary files). In that case, the
     // TempDir will be stored here so the directory is cleaned up when Collector is dropped.
@@ -64,23 +75,28 @@ impl Collector {
             diagnostics_dir.as_path(),
             "ir".as_ref(),
         ]))?;
+        let (diagnostics_sender, diagnostics_receiver) = channel();
         Ok(Collector {
-            shared: Arc::new(Mutex::new(Some(Shared {
-                diagnostics: Diagnostics {},
+            diagnostics_receiver,
+            shared: Arc::new(Mutex::new(Shared {
+                diagnostics: Diagnostics::new(),
                 diagnostics_dir,
-            }))),
+                diagnostics_sender,
+            })),
             _tempdir,
         })
     }
 
-    /// Consumes this [Collector], extracting the collected diagnostics. Diagnostics emitted after
-    /// this is called will be dropped rather than written to the diagnostics directory (if e.g. an
-    /// unjoined background thread tries to write diagnostics).
+    /// Waits until all reporters have been dropped, then consumes this [Collector], extracting the
+    /// collected diagnostics.
     pub fn diagnostics(self) -> Diagnostics {
-        lock_shared(&self.shared)
-            .take()
-            .expect("diagnostics Shared missing")
-            .diagnostics
+        if Arc::strong_count(&self.shared) > 1 {
+            info!("Waiting for remaining reporters to be dropped");
+        }
+        drop(self.shared);
+        self.diagnostics_receiver
+            .recv()
+            .expect("no Diagnostics sent")
     }
 
     /// Returns a new [Reporter] that passes diagnostics to this Collector.
@@ -94,15 +110,13 @@ impl Collector {
 /// A handle used to report diagnostics. Created by using `Collector::reporter`.
 #[derive(Clone)]
 pub(crate) struct Reporter {
-    shared: Arc<Mutex<Option<Shared>>>,
+    shared: Arc<Mutex<Shared>>,
 }
 
 impl Reporter {
     /// Reports a new version of the IR.
     pub fn report_ir_version(&self, version: u64, snapshot: &HarvestIR) {
-        let Some(ref mut shared) = *lock_shared(&self.shared) else {
-            return;
-        };
+        let shared = lock_shared(&self.shared);
         let mut path = shared.diagnostics_dir.clone();
         path.push("ir");
         path.push(format!("{version:03}"));
@@ -146,7 +160,7 @@ pub(crate) enum CollectorNewError {
 
 /// Utility to lock one of the `Shared` references, logging an error if it is poisoned (and
 /// unpoisoning it).
-fn lock_shared<'m>(shared: &'m Mutex<Option<Shared>>) -> MutexGuard<'m, Option<Shared>> {
+fn lock_shared<'m>(shared: &'m Mutex<Shared>) -> MutexGuard<'m, Shared> {
     match shared.lock() {
         Ok(guard) => guard,
         Err(poisoned) => {
@@ -164,4 +178,14 @@ struct Shared {
     diagnostics: Diagnostics,
     // Path to the root of the diagnostics directory structure.
     diagnostics_dir: PathBuf,
+    // Channel to send the Diagnostics to the Collector when this Shared is dropped.
+    diagnostics_sender: Sender<Diagnostics>,
+}
+
+impl Drop for Shared {
+    fn drop(&mut self) {
+        let _ = self
+            .diagnostics_sender
+            .send(replace(&mut self.diagnostics, Diagnostics::new()));
+    }
 }
