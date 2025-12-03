@@ -169,7 +169,7 @@ impl RawDir {
         let file_name = match segments.pop() {
             None => return Err(GetFileError::DoesNotExist),
             Some(empty) if empty.is_empty() => return Err(GetFileError::DoesNotExist),
-            Some(name) => name.into(),
+            Some(name) => name,
         };
 
         let mut cur_dir = self;
