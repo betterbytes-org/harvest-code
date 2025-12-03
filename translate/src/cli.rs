@@ -22,6 +22,10 @@ pub struct Args {
     #[arg(long, short)]
     pub force: bool,
 
+    /// Budget for retrying llm translation based on failed builds or tests.
+    #[arg(short, long, default_value_t = 0)]
+    pub retries: u32,
+
     /// Path to the directory containing the C code to translate.
     // Should always be present unless using a subcommand like --print-config-path
     pub input: Option<PathBuf>,
@@ -63,6 +67,9 @@ pub struct Config {
     /// Sub-configuration for each tool.
     pub tools: tools::ToolConfigs,
 
+    /// Budget for retrying llm translation based on failed builds or tests.
+    pub retries: u32,
+
     // serde will place any unrecognized fields here. This will be passed to unknown_field_warning
     // after parsing to emit warnings on unrecognized config entries (we don't error on unknown
     // fields because that can be annoying to work with if you are switching back and forth between
@@ -80,6 +87,7 @@ impl Config {
             diagnostics_dir: None,
             force: false,
             tools: tools::ToolConfigs::mock(),
+            retries: 0,
             unknown: HashMap::new(),
         }
     }
@@ -137,6 +145,10 @@ fn load_config(args: &Args, config_dir: &Path) -> Config {
             .set_override("force", "true")
             .expect("settings override failed");
     }
+
+    settings = settings
+        .set_override("retries", args.retries.to_string())
+        .expect("settings override failed");
 
     // We need to set an override so that deserializing the config does not error.
     // However, the config crate does not support providing a Path in an override.

@@ -88,12 +88,7 @@ fn raw_cargo_package(ir: &HarvestIR) -> Result<&RawDir, Box<dyn std::error::Erro
 
     match cargo_packages.len() {
         0 => Err("No CargoPackage representation found in IR".into()),
-        1 => Ok(cargo_packages[0]),
-        n => Err(format!(
-            "Found {} CargoPackage representations, expected at most 1",
-            n
-        )
-        .into()),
+        _ => Ok(cargo_packages.last().unwrap()),
     }
 }
 

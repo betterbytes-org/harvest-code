@@ -12,13 +12,100 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Arc;
 
 /// Structured output JSON schema for Ollama.
 const STRUCTURED_OUTPUT_SCHEMA: &str = include_str!("structured_schema.json");
 
 const SYSTEM_PROMPT: &str = include_str!("system_prompt.txt");
 
-pub struct RawSourceToCargoLlm;
+/// Builds an LLM instance with the provided configuration.
+pub fn build_llm(config: &Config) -> Result<Box<dyn llm::LLMProvider>, Box<dyn std::error::Error>> {
+    let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
+
+    // TODO: This is a workaround for a flaw in the current
+    // version (1.3.4) of the `llm` crate. While it supports
+    // OpenRouter, the `openrouter` variant hadn't been added to
+    // `from_str`. It's fixed on git tip, but not in a release
+    // version. So just check for that case explicitly.
+    let backend = if config.backend == "openrouter" {
+        LLMBackend::OpenRouter
+    } else {
+        LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND")
+    };
+
+    let mut llm_builder = LLMBuilder::new()
+        .backend(backend)
+        .model(&config.model)
+        .max_tokens(config.max_tokens)
+        .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
+        .schema(output_format)
+        .system(SYSTEM_PROMPT);
+
+    if let Some(ref address) = config.address
+        && !address.is_empty()
+    {
+        llm_builder = llm_builder.base_url(address);
+    }
+    if let Some(ref api_key) = config.api_key
+        && !api_key.0.is_empty()
+    {
+        llm_builder = llm_builder.api_key(&api_key.0);
+    }
+
+    Ok(llm_builder.build().expect("Failed to build LLM"))
+}
+
+/// Builds the LLM translation request.
+/// If this is the first time attempting translation, provide the source files.
+/// Otherwise, provide the last compiler error.
+fn build_initial_translation_request(in_dir: &RawDir) -> Vec<ChatMessage> {
+    let mut request: Vec<String> = vec![
+        "Please translate the following C project into a Rust project including Cargo manifest:"
+            .into(),
+    ];
+    request.push(
+        serde_json::json!({"files": (&in_dir.files_recursive().iter().map(|(path, contents)| {
+                OutputFile {
+                    path: path.clone(),
+                    contents: String::from_utf8_lossy(contents).into(),
+                }
+        }).collect::<Vec<OutputFile>>())})
+        .to_string(),
+    );
+    // "return as JSON" is suggested by https://ollama.com/blog/structured-outputs
+    request.push("return as JSON".into());
+    request
+        .iter()
+        .map(|contents| ChatMessage::user().content(contents).build())
+        .collect()
+}
+
+fn build_retry_request(last_error: &str) -> Vec<ChatMessage> {
+    let request: Vec<String> = vec![
+        "The previous Rust project you generated failed to compile with the following error:"
+            .into(),
+        last_error.into(),
+        "Please fix the Rust project accordingly and return the updated files as JSON.".into(),
+    ];
+    request
+        .iter()
+        .map(|contents| ChatMessage::user().content(contents).build())
+        .collect()
+}
+
+pub struct RawSourceToCargoLlm {
+    llm: Arc<dyn llm::LLMProvider>,
+    previous_build_results: Vec<String>,
+}
+impl RawSourceToCargoLlm {
+    pub fn new(llm: Arc<dyn llm::LLMProvider>, previous_build_results: &[String]) -> Self {
+        RawSourceToCargoLlm {
+            llm,
+            previous_build_results: previous_build_results.to_vec(),
+        }
+    }
+}
 
 impl Tool for RawSourceToCargoLlm {
     fn name(&self) -> &'static str {
@@ -38,60 +125,17 @@ impl Tool for RawSourceToCargoLlm {
         log::debug!("LLM Configuration {config:?}");
         let in_dir = raw_source(&context.ir_snapshot).unwrap();
 
-        // Use the llm crate to connect to Ollama.
-
-        let output_format: StructuredOutputFormat = serde_json::from_str(STRUCTURED_OUTPUT_SCHEMA)?;
-
-        // TODO: This is a workaround for a flaw in the current
-        // version (1.3.4) of the `llm` crate. While it supports
-        // OpenRouter, the `openrouter` variant hadn't been added to
-        // `from_str`. It's fixed on git tip, but not in a release
-        // version. So just check for that case explicitly.
-        let backend = if config.backend == "openrouter" {
-            LLMBackend::OpenRouter
-        } else {
-            LLMBackend::from_str(&config.backend).expect("unknown LLM_BACKEND")
-        };
-        let llm = {
-            let mut llm_builder = LLMBuilder::new()
-                .backend(backend)
-                .model(&config.model)
-                .max_tokens(config.max_tokens)
-                .temperature(0.0) // Suggestion from https://ollama.com/blog/structured-outputs
-                .schema(output_format)
-                .system(SYSTEM_PROMPT);
-
-            if let Some(ref address) = config.address
-                && !address.is_empty()
-            {
-                llm_builder = llm_builder.base_url(address);
+        // Build the llm translation request.
+        let request = match self.previous_build_results.last() {
+            Some(last_error) => {
+                // There was a previous build error - provide it to the LLM for context.
+                build_retry_request(last_error)
             }
-            if let Some(ref api_key) = config.api_key
-                && !api_key.0.is_empty()
-            {
-                llm_builder = llm_builder.api_key(&api_key.0);
+            None => {
+                // No previous build errors - this is the initial translation attempt.
+                build_initial_translation_request(in_dir)
             }
-
-            llm_builder.build().expect("Failed to build LLM (Ollama)")
         };
-
-        // Assemble the Ollama request.
-        let mut request = vec!["Please translate the following C project into a Rust project including Cargo manifest:".into()];
-        request.push(
-            serde_json::json!({"files": (&in_dir.files_recursive().iter().map(|(path, contents)| {
-                OutputFile {
-                    path: path.clone(),
-                    contents: String::from_utf8_lossy(contents).into(),
-                }
-        }).collect::<Vec<OutputFile>>())})
-            .to_string(),
-        );
-        // "return as JSON" is suggested by https://ollama.com/blog/structured-outputs
-        request.push("return as JSON".into());
-        let request: Vec<_> = request
-            .iter()
-            .map(|contents| ChatMessage::user().content(contents).build())
-            .collect();
 
         // Make the LLM call.
         log::trace!("Making LLM call with {:?}", request);
@@ -100,7 +144,7 @@ impl Tool for RawSourceToCargoLlm {
             .enable_time()
             .build()
             .expect("tokio failed")
-            .block_on(llm.chat(&request))?
+            .block_on(self.llm.chat(&request))?
             .text()
             .expect("no response text");
 

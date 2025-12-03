@@ -62,6 +62,7 @@ pub fn translate_c_directory_to_rust_project(
         output: Some(output_dir.to_path_buf()),
         print_config_path: false,
         config: config_overrides.to_vec(),
+        retries: 0,
         force: false,
     }
     .into();
