@@ -30,14 +30,12 @@ impl Tool for RawSourceToCargoLlm {
 
     fn might_write(&mut self, context: MightWriteContext) -> MightWriteOutcome {
         // We need a raw_source to be available, but we won't write any existing IDs.
-        match context
-            .ir
-            .get_by_representation::<ProjectKind>()
-            .zip(context.ir.get_by_representation::<RawSource>())
-            .next()
-        {
-            None => MightWriteOutcome::TryAgain,
-            Some(_) => MightWriteOutcome::Runnable([].into()),
+        match (
+            context.ir.get_by_representation::<ProjectKind>().next(),
+            context.ir.get_by_representation::<RawSource>().next(),
+        ) {
+            (Some(_), Some(_)) => MightWriteOutcome::Runnable([].into()),
+            _ => MightWriteOutcome::TryAgain,
         }
     }
 
