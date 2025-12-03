@@ -48,7 +48,8 @@ impl ToolConfigs {
 /// time the scheduler constructs the tool it is aware of the tool's concrete
 /// type.
 pub trait Tool: Send + 'static {
-    /// This tool's name.
+    /// This tool's name. Should be snake case, as this will be used to create directory and/or
+    /// file names.
     fn name(&self) -> &'static str;
 
     /// Returns an indication of whether the tool can be run now, and if it can be run, which IDs

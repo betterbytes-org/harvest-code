@@ -19,7 +19,7 @@ impl LoadRawSource {
 
 impl Tool for LoadRawSource {
     fn name(&self) -> &'static str {
-        "LoadRawSource"
+        "load_raw_source"
     }
 
     // LoadRawSource will create a new representation, not modify an existing

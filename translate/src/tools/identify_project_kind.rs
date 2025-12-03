@@ -28,7 +28,7 @@ pub struct IdentifyProjectKind;
 
 impl Tool for IdentifyProjectKind {
     fn name(&self) -> &'static str {
-        "IdentifyProjectKind"
+        "identify_project_kind"
     }
 
     fn might_write(&mut self, context: MightWriteContext) -> MightWriteOutcome {

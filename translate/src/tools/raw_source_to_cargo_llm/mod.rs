@@ -25,7 +25,7 @@ pub struct RawSourceToCargoLlm;
 
 impl Tool for RawSourceToCargoLlm {
     fn name(&self) -> &'static str {
-        "RawSourceToCargoLlm"
+        "raw_source_to_cargo_llm"
     }
 
     fn might_write(&mut self, context: MightWriteContext) -> MightWriteOutcome {

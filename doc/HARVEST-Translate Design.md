@@ -86,15 +86,16 @@ The diagnostic output is emitted to a directory. It will have at least the
 following subdirectories:
 
 * `ir/` Contains all the revisions of the HARVEST-IR. The first revision
-  (after the first tool completes running) will be named `0001` (field width to
+  (after the first tool completes running) will be named `001` (field width to
   be extended as necessary to keep them all the same size). The second revision
-  (after the second tool invocation) will be `0002`, etc.
+  (after the second tool invocation) will be `002`, etc.
 * `steps/` Contains a subdirectory for each tool invocation. The name of each
-  subdirectory is the same as the name of the IR revision immediately after that
-  tool finishes. As a result, `0000` will be skipped and the subdirectory
-  numbers will start at `0001`. Each subdirectory will contain:
+  subdirectory is `$tool_$number`, where `$number` is the (0-padded) number of
+  times that particular tool has been run (for example, the first run of the
+  `try_cargo_build` tool will have subdirectory name `try_cargo_build_001`).
+  Each subdirectory will contain:
   - `start_ir` A symlink to the IR revision the tool was launched with (i.e.
-    links to `../../ir/####`).
+    links to `../../ir/###`).
   - `end_ir` A symlink to the IR revision the tool was completed with.
   - `messages` A file with diagnostic messages produced by that tool invocation
     (`harvest_translate` should provide each tool with something it can
