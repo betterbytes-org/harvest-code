@@ -1,5 +1,6 @@
 //! Individual tools (and their interfaces) used by HARVEST to translate C to Rust.
 
+pub mod identify_project_kind;
 pub mod load_raw_source;
 pub mod raw_source_to_cargo_llm;
 pub mod try_cargo_build;
