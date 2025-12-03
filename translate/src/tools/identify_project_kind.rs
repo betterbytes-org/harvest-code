@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::Path};
+use std::fmt::Display;
 
 use harvest_ir::Representation;
 
@@ -21,14 +21,6 @@ impl Display for ProjectKind {
 impl Representation for ProjectKind {
     fn name(&self) -> &'static str {
         "KindAndName"
-    }
-
-    fn materialize(&self, path: &Path) -> std::io::Result<()> {
-        std::fs::create_dir(path)?;
-        match self {
-            ProjectKind::Library => std::fs::write(path.join("library"), []),
-            ProjectKind::Executable => std::fs::write(path.join("executable"), []),
-        }
     }
 }
 
