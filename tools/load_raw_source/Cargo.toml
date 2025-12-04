@@ -1,0 +1,11 @@
+[package]
+name = "load_raw_source"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+log.workspace = true
+harvest_ir.workspace = true
+
+[lints]
+workspace = true

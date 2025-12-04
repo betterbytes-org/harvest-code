@@ -6,6 +6,8 @@ use std::ffi::OsString;
 use std::fs::ReadDir;
 use std::path::{Component, Path, PathBuf};
 
+use crate::Representation;
+
 /// A representation of a file-system directory entry.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq))]
@@ -379,5 +381,41 @@ mod tests {
             ].into_iter().collect()))),
             ("file1.txt".into(), RawEntry::File(b"A".into())),
         ].into_iter().collect()));
+    }
+}
+
+/// A raw C project passed as input.
+pub struct RawSource {
+    pub dir: RawDir,
+}
+
+impl std::fmt::Display for RawSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "Raw C source:")?;
+        self.dir.display(0, f)
+    }
+}
+
+impl Representation for RawSource {
+    fn materialize(&self, path: &Path) -> std::io::Result<()> {
+        self.dir.materialize(path)
+    }
+}
+
+/// A cargo project representation (Cargo.toml, src/, etc).
+pub struct CargoPackage {
+    pub dir: RawDir,
+}
+
+impl std::fmt::Display for CargoPackage {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "Cargo package:")?;
+        self.dir.display(0, f)
+    }
+}
+
+impl Representation for CargoPackage {
+    fn materialize(&self, path: &Path) -> std::io::Result<()> {
+        self.dir.materialize(path)
     }
 }

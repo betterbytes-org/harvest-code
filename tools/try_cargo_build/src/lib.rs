@@ -1,8 +1,8 @@
 //! Checks if a generated Rust project builds by materializing
 //! it to a tempdir and running `cargo build --release`.
-use crate::tools::raw_source_to_cargo_llm::CargoPackage;
-use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
+use harvest_ir::fs::CargoPackage;
 use harvest_ir::{HarvestIR, Representation, fs::RawDir};
+use harvest_ir::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -113,7 +113,7 @@ impl Tool for TryCargoBuild {
     fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
         // Get cargo package representation
         let cargo_package = raw_cargo_package(&context.ir_snapshot)?;
-        let output_path = context.config.output.clone();
+        let output_path = Default::default(); //context.config.output.clone();
         cargo_package.materialize(&output_path)?;
 
         // Validate that the Rust project builds
@@ -150,10 +150,6 @@ impl std::fmt::Display for CargoBuildResult {
 }
 
 impl Representation for CargoBuildResult {
-    fn name(&self) -> &'static str {
-        "CargoBuildResult"
-    }
-
     fn materialize(&self, _path: &Path) -> std::io::Result<()> {
         Ok(())
     }

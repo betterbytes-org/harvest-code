@@ -1,0 +1,12 @@
+[package]
+name = "try_cargo_build"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+log.workspace = true
+harvest_ir.workspace = true
+cargo_metadata = "0.23.1"
+
+[lints]
+workspace = true

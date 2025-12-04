@@ -1,7 +1,7 @@
 use crate::diagnostics::Reporter;
-use crate::tools::{RunContext, Tool};
 use harvest_ir::edit::{self, NewEditError};
 use harvest_ir::{Edit, HarvestIR, Id};
+use harvest_ir::{RunContext, Tool};
 use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Debug, Formatter};
 use std::iter::once;
@@ -92,11 +92,12 @@ impl ToolRunner {
             // to be unwind safe, so instead this function needs to make sure that values *in this
             // same thread* that `tool` might touch are appropriately dropped/forgotten if `run`
             // panics.
+            let tool_config = config.tools.get(tool.name()).unwrap_or_default();
             let result = catch_unwind(AssertUnwindSafe(|| {
                 tool.run(RunContext {
                     ir_edit: &mut edit,
                     ir_snapshot,
-                    config,
+                    config: tool_config.clone(),
                 })
                 .map(|_| edit)
             }));
@@ -141,10 +142,10 @@ struct RunningInvocation {
 #[cfg(all(test, not(miri)))]
 mod tests {
     use super::*;
-    use crate::MightWriteOutcome::Runnable;
     use crate::cli::Config;
     use crate::diagnostics::Collector;
     use crate::test_util::MockTool;
+    use harvest_ir::MightWriteOutcome::Runnable;
     use harvest_ir::Representation;
     use harvest_ir::edit::{self, NewEditError};
     use std::fmt::{self, Display, Formatter};
@@ -155,11 +156,7 @@ mod tests {
             write!(f, "TestRepresentation")
         }
     }
-    impl Representation for TestRepresentation {
-        fn name(&self) -> &'static str {
-            "test"
-        }
-    }
+    impl Representation for TestRepresentation {}
 
     #[test]
     fn new_edit_errors() {

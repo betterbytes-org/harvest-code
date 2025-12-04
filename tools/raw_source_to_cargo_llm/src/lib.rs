@@ -1,19 +1,18 @@
 //! Attempts to directly turn a C project into a Cargo project by throwing it at
 //! an LLM via the `llm` crate.
 
-use crate::cli::unknown_field_warning;
-use crate::load_raw_source::RawSource;
-use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
-use harvest_ir::{Representation, fs::RawDir};
+use harvest_ir::fs::RawDir;
+use harvest_ir::fs::{CargoPackage, RawSource};
+use harvest_ir::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use llm::builder::{LLMBackend, LLMBuilder};
 use llm::chat::{ChatMessage, StructuredOutputFormat};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::str::FromStr;
 
-use super::identify_project_kind::ProjectKind;
+use identify_project_kind::ProjectKind;
 
 /// Structured output JSON schema for Ollama.
 const STRUCTURED_OUTPUT_SCHEMA: &str = include_str!("structured_schema.json");
@@ -40,7 +39,7 @@ impl Tool for RawSourceToCargoLlm {
     }
 
     fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
-        let config = &context.config.tools.raw_source_to_cargo_llm;
+        let config: Config = serde_json::from_value(context.config)?;
         log::debug!("LLM Configuration {config:?}");
         let in_dir = &context
             .ir_snapshot
@@ -152,29 +151,7 @@ impl Tool for RawSourceToCargoLlm {
     }
 }
 
-/// A cargo project representation (Cargo.toml, src/, etc).
-pub struct CargoPackage {
-    pub dir: RawDir,
-}
-
-impl std::fmt::Display for CargoPackage {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "Cargo package:")?;
-        self.dir.display(0, f)
-    }
-}
-
-impl Representation for CargoPackage {
-    fn name(&self) -> &'static str {
-        "CargoPackage"
-    }
-
-    fn materialize(&self, path: &Path) -> std::io::Result<()> {
-        self.dir.materialize(path)
-    }
-}
-
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ApiKey(String);
 
 impl std::fmt::Debug for ApiKey {
@@ -183,7 +160,7 @@ impl std::fmt::Debug for ApiKey {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     /// Hostname and port at which to find the LLM serve. Example: "http://[::1]:11434"
     address: Option<String>,
@@ -205,10 +182,6 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn validate(&self) {
-        unknown_field_warning("tools.raw_source_to_cargo_llm", &self.unknown);
-    }
-
     /// Returns a mock config for testing.
     pub fn mock() -> Self {
         Self {

@@ -21,6 +21,7 @@ use crate::stats::{ProgramEvalStats, SummaryStats, TestResult};
 use clap::Parser;
 use harvest_ir::HarvestIR;
 use harvest_translate::{transpile, util::set_user_only_umask};
+use serde::Deserialize;
 use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -66,7 +67,10 @@ pub fn translate_c_directory_to_rust_project(
     }
     .into();
     let config = harvest_translate::cli::initialize(args).expect("Failed to generate config");
-    let tool_config = &config.tools.raw_source_to_cargo_llm;
+    let tool_config = raw_source_to_cargo_llm::Config::deserialize(
+        config.tools.get("raw_source_to_cargo_llm").unwrap(),
+    )
+    .unwrap();
     log::info!(
         "Translating code using {}:{} with max tokens: {}",
         tool_config.backend,
