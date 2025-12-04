@@ -11,18 +11,17 @@ pub mod util;
 #[cfg(test)]
 mod test_util;
 
-use crate::load_raw_source::LoadRawSource;
-use crate::tools::raw_source_to_cargo_llm::RawSourceToCargoLlm;
-use crate::tools::try_cargo_build::TryCargoBuild;
-use crate::tools::{MightWriteContext, MightWriteOutcome};
 use harvest_ir::HarvestIR;
 use harvest_ir::edit::{self, NewEditError};
+use harvest_ir::{MightWriteContext, MightWriteOutcome};
+use identify_project_kind::IdentifyProjectKind;
+use load_raw_source::LoadRawSource;
 use log::{debug, error, info};
+use raw_source_to_cargo_llm::RawSourceToCargoLlm;
 use runner::{SpawnToolError, ToolRunner};
 use scheduler::Scheduler;
 use std::sync::Arc;
-use tools::identify_project_kind::IdentifyProjectKind;
-use tools::load_raw_source;
+use try_cargo_build::TryCargoBuild;
 
 /// Performs the complete transpilation process using the scheduler.
 pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std::error::Error>> {

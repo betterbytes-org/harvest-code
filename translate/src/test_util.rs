@@ -1,6 +1,6 @@
 //! Place to put utilities that are only used by tests.
 
-use crate::tools::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
+use harvest_ir::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 use std::error::Error;
 
 /// Returns a new temporary directory. Unlike the defaults in the `tempdir` and `tempfile` crates,
