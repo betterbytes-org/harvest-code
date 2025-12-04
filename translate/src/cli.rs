@@ -1,7 +1,6 @@
 //! The command-line arguments and configuration system for [crate::transpile] and HARVEST's
 //! `translate` binary.
 
-use crate::tools;
 use clap::Parser;
 use config::FileFormat::Toml;
 use directories::ProjectDirs;
@@ -61,7 +60,7 @@ pub struct Config {
     pub force: bool,
 
     /// Sub-configuration for each tool.
-    pub tools: tools::ToolConfigs,
+    pub tools: HashMap<String, Value>,
 
     // serde will place any unrecognized fields here. This will be passed to unknown_field_warning
     // after parsing to emit warnings on unrecognized config entries (we don't error on unknown
@@ -79,7 +78,7 @@ impl Config {
             output: PathBuf::from("mock_output"),
             diagnostics_dir: None,
             force: false,
-            tools: tools::ToolConfigs::mock(),
+            tools: [(String::from(""), serde_json::json!({}))].into(),
             unknown: HashMap::new(),
         }
     }
@@ -89,7 +88,7 @@ impl Config {
 ///
 /// This is intended for use by config validation routines. `prefix` should be the path to this
 /// entry (e.g. `tools::Config` should call this with a `prefix` of `tools`).
-pub(crate) fn unknown_field_warning(prefix: &str, unknown: &HashMap<String, Value>) {
+pub fn unknown_field_warning(prefix: &str, unknown: &HashMap<String, Value>) {
     let mut entries: Vec<_> = unknown.keys().collect();
     entries.sort_unstable();
     entries.into_iter().for_each(|name| match prefix {
@@ -111,7 +110,6 @@ pub fn initialize(args: Arc<Args>) -> Option<Arc<Config>> {
     }
     let config = load_config(&args, dirs.config_dir());
     unknown_field_warning("", &config.unknown);
-    config.tools.validate();
     Some(config.into())
 }
 

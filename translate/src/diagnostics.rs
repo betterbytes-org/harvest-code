@@ -132,7 +132,7 @@ impl Reporter {
                 error!("Failed to materialize repr: {error}");
             }
             path.pop();
-            types.push((id, id_string, repr.name()));
+            types.push((id, id_string, std::any::type_name_of_val(repr)));
         }
         // TODO: For now, HarvestIR does not guarantee a particular iteration order, but it
         // *happens* to iterate in this same order. We should figure out what guarantees we want

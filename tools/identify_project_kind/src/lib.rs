@@ -2,7 +2,8 @@ use std::fmt::Display;
 
 use harvest_ir::Representation;
 
-use super::{MightWriteContext, MightWriteOutcome, RunContext, Tool, load_raw_source::RawSource};
+use harvest_ir::fs::RawSource;
+use harvest_ir::{MightWriteContext, MightWriteOutcome, RunContext, Tool};
 
 pub enum ProjectKind {
     Library,
@@ -18,11 +19,7 @@ impl Display for ProjectKind {
     }
 }
 
-impl Representation for ProjectKind {
-    fn name(&self) -> &'static str {
-        "KindAndName"
-    }
-}
+impl Representation for ProjectKind {}
 
 pub struct IdentifyProjectKind;
 
