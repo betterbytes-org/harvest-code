@@ -65,7 +65,10 @@ pub fn translate_c_directory_to_rust_project(
         force: false,
     }
     .into();
-    let config = harvest_translate::cli::initialize(args).expect("Failed to generate config");
+    let mut config = harvest_translate::cli::initialize(args).expect("Failed to generate config");
+    if config.log_filter.is_empty() {
+        config.log_filter = "off".to_owned(); // Disable console logging in harvest_translate
+    }
     let tool_config = &config.tools.raw_source_to_cargo_llm;
     log::info!(
         "Translating code using {}:{} with max tokens: {}",
@@ -73,7 +76,7 @@ pub fn translate_c_directory_to_rust_project(
         tool_config.model,
         tool_config.max_tokens
     );
-    let ir_result = transpile(config);
+    let ir_result = transpile(config.into());
     let raw_c_source = raw_source(ir_result.as_ref().unwrap()).unwrap();
     raw_c_source
         .materialize(output_dir.join("c_src"))

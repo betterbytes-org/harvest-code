@@ -35,11 +35,10 @@ pub struct MockTool {
 /// ```
 #[cfg_attr(miri, allow(unused))]
 impl MockTool {
-    /// Creates a new MockTool. The MockTool is boxed, because most users of MockTool will use it
-    /// to create a `Box<dyn Tool>`.
+    /// Creates a new MockTool.
     pub fn new() -> MockTool {
         MockTool {
-            name: "MockTool",
+            name: "mock_tool",
             might_write: Box::new(|_| MightWriteOutcome::Runnable([].into())),
             run: Box::new(|_| Ok(())),
         }

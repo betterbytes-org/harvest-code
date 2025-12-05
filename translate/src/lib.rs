@@ -17,12 +17,12 @@ use crate::tools::try_cargo_build::TryCargoBuild;
 use crate::tools::{MightWriteContext, MightWriteOutcome};
 use harvest_ir::HarvestIR;
 use harvest_ir::edit::{self, NewEditError};
-use log::{debug, error, info};
 use runner::{SpawnToolError, ToolRunner};
-use scheduler::Scheduler;
+use scheduler::{NextInvocationOutcome, Scheduler};
 use std::sync::Arc;
 use tools::identify_project_kind::IdentifyProjectKind;
 use tools::load_raw_source;
+use tracing::{debug, error, info};
 
 /// Performs the complete transpilation process using the scheduler.
 pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std::error::Error>> {
@@ -37,11 +37,12 @@ pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std
     loop {
         let snapshot = ir_organizer.snapshot();
         scheduler.next_invocations(|mut tool| {
+            use NextInvocationOutcome::{DontTryAgain, Error, TryLater};
             let name = tool.name();
             let might_write = match tool.might_write(MightWriteContext { ir: &snapshot }) {
                 MightWriteOutcome::NotRunnable => {
                     debug!("Tool {name} is not runnable");
-                    return None;
+                    return DontTryAgain;
                 }
                 MightWriteOutcome::Runnable(might_write) => {
                     debug!("Tool {name} is runnable");
@@ -49,7 +50,7 @@ pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std
                 }
                 MightWriteOutcome::TryAgain => {
                     debug!("Tool {name} returned TryAgain");
-                    return Some(tool);
+                    return TryLater(tool);
                 }
             };
             match runner.spawn_tool(
@@ -59,26 +60,24 @@ pub fn transpile(config: Arc<cli::Config>) -> Result<Arc<HarvestIR>, Box<dyn std
                 might_write,
                 config.clone(),
             ) {
-                Err(SpawnToolError {
-                    cause: NewEditError::IdInUse,
-                    tool,
-                }) => {
-                    debug!("Not spawning {name} because an ID it needs is in use.");
-                    Some(tool)
+                Err((SpawnToolError::IoError(error), _)) => {
+                    error!("I/O error spawning tool: {error}");
+                    Error(SpawnToolError::IoError(error).into())
                 }
-                Err(SpawnToolError {
-                    cause: NewEditError::UnknownId,
-                    tool: _,
-                }) => {
+                Err((SpawnToolError::NewEdit(NewEditError::IdInUse), tool)) => {
+                    debug!("Not spawning {name} because an ID it needs is in use.");
+                    TryLater(tool)
+                }
+                Err((SpawnToolError::NewEdit(NewEditError::UnknownId), _)) => {
                     error!("Tool {name}: might_write returned an unknown ID");
-                    None
+                    DontTryAgain
                 }
                 Ok(()) => {
                     info!("Launched tool {name}");
-                    None
+                    DontTryAgain
                 }
             }
-        });
+        })?;
         if !runner.process_tool_results(&mut ir_organizer) {
             // No tools are running now, which also indicates that no tools are schedulable.
             // Eventually we need some way to determine whether this is a successful outcome or a
