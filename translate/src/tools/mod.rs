@@ -5,12 +5,13 @@ pub mod load_raw_source;
 pub mod raw_source_to_cargo_llm;
 pub mod try_cargo_build;
 
-use crate::{cli::unknown_field_warning, diagnostics::ToolReporter};
+use crate::cli::unknown_field_warning;
 use harvest_ir::{Edit, HarvestIR, Id};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::thread::JoinHandle;
 
 /// Combined configuration for all Tools in this crate.
 #[derive(Debug, Deserialize)]
@@ -109,5 +110,20 @@ pub struct RunContext<'a> {
 
     /// Handle through which to report diagnostics and create temporary directories (which live
     /// inside the diagnostics directory).
-    pub reporter: ToolReporter,
+    pub reporter: Box<dyn Fn() -> Box<dyn Sync + Send>>,
+}
+
+impl<'a> RunContext<'a> {
+    pub fn spawn_thread<F, T>(&self, f: F) -> JoinHandle<T>
+    where
+        F: FnOnce() -> T + Send + 'static,
+        T: Send + 'static,
+    {
+        let guard = (self.reporter)();
+        std::thread::spawn(|| {
+            let result = f();
+            drop(guard);
+            result
+        })
+    }
 }
