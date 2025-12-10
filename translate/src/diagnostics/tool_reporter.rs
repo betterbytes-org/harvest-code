@@ -1,14 +1,19 @@
 //! Diagnostics-reporting infrastructure for tools.
 
-use super::{Shared, lock_shared};
+use super::{Shared, SharedWriter, lock_shared};
 use crate::tools::Tool;
-use log::info;
 use std::fmt::{self, Display, Formatter};
 use std::fs::create_dir;
+use std::io;
 use std::num::NonZeroU64;
 use std::sync::mpsc::{Receiver, Sender, channel};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::{collections::hash_map::Entry, path::PathBuf};
+use tracing::dispatcher::{DefaultGuard, set_default};
+use tracing::{Dispatch, error, info};
+use tracing_subscriber::fmt::layer;
+use tracing_subscriber::layer::SubscriberExt as _;
+use tracing_subscriber::{Layer as _, Registry};
 
 /// Diagnostics reporter for a specific tool run. These are provided to tools as part of their
 /// context.
@@ -22,7 +27,10 @@ pub struct ToolReporter {
 
 impl ToolReporter {
     /// To construct a ToolReporter, use [Reporter::start_tool_run], which invokes this.
-    pub(super) fn new(shared: Arc<Mutex<Shared>>, tool: &dyn Tool) -> (ToolJoiner, ToolReporter) {
+    pub(super) fn new(
+        shared: Arc<Mutex<Shared>>,
+        tool: &dyn Tool,
+    ) -> Result<(ToolJoiner, ToolReporter), io::Error> {
         let (sender, receiver) = channel();
         let tool = ToolId::new(tool);
         let mut guard = lock_shared(&shared);
@@ -44,29 +52,56 @@ impl ToolReporter {
             "steps".as_ref(),
             tool_run.to_string().as_ref(),
         ]);
+        create_dir(&tool_run_dir)?;
+        let run_messages_writer = layer()
+            .with_ansi(false)
+            .with_writer(SharedWriter::new_append(PathBuf::from_iter([
+                tool_run_dir.as_path(),
+                "messages".as_ref(),
+            ]))?);
+        let messages_writer = layer()
+            .with_ansi(false)
+            .with_writer(guard.messages_file.clone());
+        let dispatch = Registry::default()
+            .with(run_messages_writer)
+            .with(messages_writer)
+            .with(layer().with_filter(guard.console_filter.clone()))
+            .into();
         drop(guard);
-        create_dir(&tool_run_dir).expect("failed to create tool run directory");
-        (
+        Ok((
             ToolJoiner { receiver },
             ToolReporter {
-                run_shared: Arc::new(Mutex::new(RunShared { sender })),
+                run_shared: Arc::new(Mutex::new(RunShared { dispatch, sender })),
             },
-        )
+        ))
     }
 
     /// Initializes log collection for this thread. Tools should call this for each new thread they
     /// spawn, if they spawn threads. Note that the tool runner sets up the thread logger for the
     /// tool's main thread, so Tools that do not spawn any threads do not need to call this.
     pub fn setup_thread_logger(&self) -> ThreadGuard {
-        // TODO: Set up this thread's tracing subscriber.
         ThreadGuard {
+            _default_guard: set_default(&self.lock_shared().dispatch),
             run_shared: self.run_shared.clone(),
+        }
+    }
+
+    /// Utility to lock this reporter's shared reference.
+    fn lock_shared(&self) -> MutexGuard<'_, RunShared> {
+        match self.run_shared.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                error!("RunShared mutex poisoned");
+                self.run_shared.clear_poison();
+                poisoned.into_inner()
+            }
         }
     }
 }
 
 /// Guard returned by [ToolReporter::setup_thread_logger]. Cleans up the thread logger on drop.
 pub struct ThreadGuard {
+    _default_guard: DefaultGuard,
     /// [ToolJoiner::join] should not return until all ThreadGuards should be dropped, so we hold
     /// onto this reference to keep the [RunShared] alive.
     run_shared: Arc<Mutex<RunShared>>,
@@ -110,7 +145,7 @@ pub(super) struct ToolRunId {
 
 impl Display for ToolRunId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}_{}", self.tool, self.number)
+        write!(f, "{}_{:03}", self.tool, self.number)
     }
 }
 
@@ -136,6 +171,8 @@ impl ToolJoiner {
 
 /// Data shared between the `ToolReporter`s for a particular tool run.
 struct RunShared {
+    // tracing dispatcher (this is shared between this tool run's threads).
+    dispatch: Dispatch,
     // Used to send a message to ToolJoiner when RunShared is dropped.
     sender: Sender<()>,
 }
@@ -143,5 +180,21 @@ struct RunShared {
 impl Drop for RunShared {
     fn drop(&mut self) {
         let _ = self.sender.send(());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::MockTool;
+
+    #[test]
+    fn tool_run_id_display() {
+        let run_id = ToolRunId {
+            tool: ToolId::new(&MockTool::new()),
+            number: NonZeroU64::MIN,
+            _private: (),
+        };
+        assert_eq!(run_id.to_string(), "mock_tool_001");
     }
 }

@@ -12,6 +12,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use tracing::{debug, info, trace};
 
 use super::identify_project_kind::ProjectKind;
 
@@ -41,7 +42,7 @@ impl Tool for RawSourceToCargoLlm {
 
     fn run(self: Box<Self>, context: RunContext) -> Result<(), Box<dyn std::error::Error>> {
         let config = &context.config.tools.raw_source_to_cargo_llm;
-        log::debug!("LLM Configuration {config:?}");
+        debug!("LLM Configuration {config:?}");
         let in_dir = &context
             .ir_snapshot
             .get_by_representation::<RawSource>()
@@ -120,7 +121,7 @@ impl Tool for RawSourceToCargoLlm {
             .collect();
 
         // Make the LLM call.
-        log::trace!("Making LLM call with {:?}", request);
+        trace!("Making LLM call with {:?}", request);
         let response = tokio::runtime::Builder::new_current_thread()
             .enable_io()
             .enable_time()
@@ -138,9 +139,9 @@ impl Tool for RawSourceToCargoLlm {
         let response = response.strip_prefix("```").unwrap_or(&response);
         let response = response.strip_prefix("json").unwrap_or(response);
         let response = response.strip_suffix("```").unwrap_or(response);
-        log::trace!("LLM responded: {:?}", &response);
+        trace!("LLM responded: {:?}", &response);
         let files: OutputFiles = serde_json::from_str(response)?;
-        log::info!("LLM response contains {} files.", files.files.len());
+        info!("LLM response contains {} files.", files.files.len());
         let mut out_dir = RawDir::default();
         for file in files.files {
             out_dir.set_file(&file.path, file.contents.into())?;

@@ -16,16 +16,16 @@ cargo_metadata = "0.23.0"
 clap = { workspace = true }
 config = { default-features = false, features = ["toml"], version = "0.15.18" }
 directories = "6.0.0"
-env_logger = "0.11.8"
 harvest_ir = { workspace = true }
 libc = "0.2.177"
 llm = { default-features = false, features = ["ollama", "openai", "openrouter", "rustls-tls" ], version = "1.3.4" }
-log = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { features = ["net", "rt"], version = "1.47.1" }
+tracing-subscriber = { features = ["env-filter"], version = "0.3.22" }
+tracing = { default-features = false, features = ["std"], version = "0.1.43" }
 
 [lints]
 workspace = true
