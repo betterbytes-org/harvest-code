@@ -105,7 +105,7 @@ impl ToolRunner {
                     ir_edit: &mut edit,
                     ir_snapshot,
                     config,
-                    reporter: tool_reporter,
+                    reporter: Box::new(move || Box::new(tool_reporter.setup_thread_logger())),
                 })
                 .map(|_| edit)
             }));
