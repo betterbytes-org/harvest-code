@@ -1,5 +1,5 @@
 [workspace]
-members = ["benchmark", "ir", "translate"]
+members = ["benchmark", "fs", "ir", "translate"]
 resolver = "3"
 
 [workspace.dependencies]

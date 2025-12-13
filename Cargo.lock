@@ -477,6 +477,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "harvest_fs"
+version = "0.1.0"
+
+[[package]]
 name = "harvest_ir"
 version = "0.1.0"
 dependencies = [
