@@ -37,8 +37,7 @@ verify_fix_agentic.workspace = true
 build_c_artifact.workspace = true
 generate_difftest_suite.workspace = true
 run_difftest.workspace = true
-
-[dev-dependencies]
+fix_diff_failures.workspace = true
 full_source.workspace = true
 
 [lints]
