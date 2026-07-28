@@ -1464,6 +1464,7 @@ dependencies = [
  "generate_difftest_suite",
  "harvest_core",
  "libc",
+ "load_cargo_package",
  "load_raw_source",
  "modular_translation_llm",
  "quantize_rust_spans",
@@ -1908,6 +1909,15 @@ dependencies = [
  "serde_yaml",
  "tokio",
  "toml 0.8.23",
+]
+
+[[package]]
+name = "load_cargo_package"
+version = "0.1.0"
+dependencies = [
+ "full_source",
+ "harvest_core",
+ "tracing",
 ]
 
 [[package]]

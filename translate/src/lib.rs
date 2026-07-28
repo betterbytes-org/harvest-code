@@ -14,8 +14,9 @@ use emit_build_features::EmitBuildFeatures;
 use fix_declarations_llm::FixDeclarationsLlm;
 use generate_difftest_suite::GenerateDiffTestSuite;
 use harvest_core::config::Config;
-use harvest_core::utils::get_version;
-use harvest_core::{HarvestIR, diagnostics};
+use harvest_core::utils::{empty_writable_dir, get_version};
+use harvest_core::{HarvestIR, Id, diagnostics};
+use load_cargo_package::LoadCargoPackage;
 use load_raw_source::LoadRawSource;
 use modular_translation_llm::ModularTranslationLlm;
 use quantize_rust_spans::QuantizeRustSpans;
@@ -30,6 +31,21 @@ use try_cargo_build::{CargoBuildResult, TryCargoBuild};
 use verify_fix_agentic::VerifyFixAgentic;
 use write_output::WriteOutput;
 
+/// Stage subdirectory names inside the `-o` output workspace. The output path
+/// is treated as a workspace anchor: the translation stage writes to
+/// `<output>/translated` and the verification stage to `<output>/verified`, so
+/// the two stages are self-describing and compose without the caller wiring up
+/// any input/output plumbing.
+const TRANSLATED_SUBDIR: &str = "translated";
+const VERIFIED_SUBDIR: &str = "verified";
+
+/// Returns true if `dir` looks like it already holds a translated crate (has a
+/// `Cargo.toml`). Used to decide whether the verify stage can load an existing
+/// translation instead of re-running translation from scratch.
+fn has_existing_crate(dir: &std::path::Path) -> bool {
+    dir.join("Cargo.toml").is_file()
+}
+
 /// Performs the complete transpilation process using the scheduler.
 pub fn transpile(config: Arc<Config>) -> Result<HarvestIR, Box<dyn std::error::Error>> {
     // Basic tool setup
@@ -41,13 +57,53 @@ pub fn transpile(config: Arc<Config>) -> Result<HarvestIR, Box<dyn std::error::E
     info!("Harvest version: {}", get_version());
     info!("Transpiling with: {}", config.model_info().unwrap());
 
+    // The `-o` path is a workspace anchor: translation writes to
+    // `<output>/translated`, verification writes to `<output>/verified`.
+    let translated_dir = config.output.join(TRANSLATED_SUBDIR);
+    let verified_dir = config.output.join(VERIFIED_SUBDIR);
+
+    // Resume seam: when the verify stage is requested and a translation already
+    // exists at `<output>/translated`, load it instead of re-translating. This
+    // lets `--agentic` then `--agentic-verify` compose on the same `-o` without
+    // repeating the (expensive) translation. If no prior translation exists,
+    // fall back to translating first, then verifying.
+    let resume_verify = config.agentic && config.agentic_verify && has_existing_crate(&translated_dir);
+
+    // Prepare the output workspace. We only empty the stage subdirs we are
+    // about to (re)write, so a resume-verify run preserves `<output>/translated`
+    // (its input) while still clearing a stale `<output>/verified`.
+    // `--force` controls whether a nonempty target subdir is erased vs errored.
+    std::fs::create_dir_all(&config.output)?;
+    if !resume_verify {
+        // A fresh translation (with or without verify) rewrites translated/.
+        empty_writable_dir(&translated_dir, config.force)?;
+    }
+    if config.agentic && config.agentic_verify {
+        empty_writable_dir(&verified_dir, config.force)?;
+    }
+
     // Setup a schedule for the transpilation.
     let load_src = scheduler.queue(LoadRawSource::new(&config.input));
     let build_cfg = scheduler.queue_after(BuildConfig, &[load_src]);
     let project_spec = scheduler.queue_after(BuildProjectSpec, &[load_src, build_cfg]);
-    let translate = if config.agentic {
+
+    // `translate_stage_pkg` is the CargoPackage id of the translation-only
+    // result (whether freshly translated or loaded from disk); `Some` only when
+    // that result should be (re)written to `<output>/translated`. When we
+    // resume from an existing translation we do not rewrite it.
+    let mut translate_stage_pkg: Option<Id> = None;
+
+    let translate = if resume_verify {
+        info!(
+            "Resuming: loading existing translation from {} (skipping translate stage)",
+            translated_dir.display()
+        );
+        let loaded = scheduler.queue(LoadCargoPackage::new(&translated_dir));
+        scheduler.queue_after(VerifyFixAgentic, &[loaded, load_src, build_cfg])
+    } else if config.agentic {
         let t = scheduler.queue_after(TranslateAgentic, &[load_src, project_spec, build_cfg]);
         if config.agentic_verify {
+            translate_stage_pkg = Some(t);
             scheduler.queue_after(VerifyFixAgentic, &[t, load_src, build_cfg])
         } else {
             t
@@ -74,6 +130,13 @@ pub fn transpile(config: Arc<Config>) -> Result<HarvestIR, Box<dyn std::error::E
     let translate = scheduler.queue_after(EmitBuildFeatures, &[translate, build_cfg]);
     let mut current_pkg_id = translate;
     let mut current_build_id = scheduler.queue_after(TryCargoBuild, &[current_pkg_id]);
+
+    // Which subdir the FINAL result goes to: verify runs -> verified/, else translated/.
+    let final_dir = if config.agentic && config.agentic_verify {
+        verified_dir
+    } else {
+        translated_dir.clone()
+    };
 
     let result: Result<(), Box<dyn std::error::Error>> = (|| {
         // Run until all tasks are complete, respecting the dependencies declared in `queue_after`
@@ -109,7 +172,11 @@ pub fn transpile(config: Arc<Config>) -> Result<HarvestIR, Box<dyn std::error::E
                 .kind,
             ProjectKind::Library
         );
-        if is_library {
+        // The built-in library difftest builds the original C with CMake, so it
+        // only applies to CMake projects. For autotools/make projects graded by
+        // an external harness, `internal_difftest = false` skips it while still
+        // writing the translated Rust output below.
+        if is_library && config.internal_difftest {
             let c_artifact = scheduler.queue_after(BuildCArtifact, &[load_src, project_spec]);
             let diff_suite = scheduler.queue_after(GenerateDiffTestSuite, &[load_src]);
             let diff_result_id =
@@ -124,7 +191,19 @@ pub fn transpile(config: Arc<Config>) -> Result<HarvestIR, Box<dyn std::error::E
             );
         }
 
-        scheduler.queue_after(WriteOutput, &[current_build_id]);
+        // When we freshly translated AND then verified in the same run, also
+        // persist the translation-only crate to `<output>/translated` so both
+        // stages exist as independent, labeled outputs and a later verify can
+        // resume from it. (Skipped when resuming, since translated/ already
+        // exists on disk.) Build it first so WriteOutput has a CargoBuildResult.
+        if let Some(pre_id) = translate_stage_pkg {
+            let pre_build = scheduler.queue_after(TryCargoBuild, &[pre_id]);
+            scheduler
+                .queue_after(WriteOutput::to(config.output.join(TRANSLATED_SUBDIR)), &[pre_build]);
+        }
+
+        // Write the final result to its stage subdir (verified/ or translated/).
+        scheduler.queue_after(WriteOutput::to(final_dir.clone()), &[current_build_id]);
         scheduler.run_all(&mut runner, &mut ir, config)?;
 
         Ok(())
