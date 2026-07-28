@@ -38,6 +38,8 @@ build_c_artifact.workspace = true
 generate_difftest_suite.workspace = true
 run_difftest.workspace = true
 fix_diff_failures.workspace = true
+generate_exec_difftests.workspace = true
+run_exec_difftest.workspace = true
 full_source.workspace = true
 
 [lints]
