@@ -1,0 +1,3 @@
+[submodule "C-TEST-CORPUS-V1"]
+	path = C-TEST-CORPUS-V1
+	url = https://github.com/UW-HARVEST/C-TEST-CORPUS-V1.git
