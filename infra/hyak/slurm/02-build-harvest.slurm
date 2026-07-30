@@ -21,6 +21,20 @@ module load llvm/21 2>/dev/null || {
   echo "WARN: llvm/21 module not found; ensure libclang-dev is available"
 }
 
+# Rust toolchain in scratch (see scripts/setup_rust.sh)
+if [[ ! -x "${CARGO_HOME}/bin/cargo" ]]; then
+  echo "Installing Rust toolchain to ${CARGO_HOME}..."
+  bash "${HARVEST_INFRA}/scripts/setup_rust.sh"
+fi
+
+# Rust toolchain (rustup in scratch; not on compute-node PATH by default)
+export PATH="${CARGO_HOME}/bin:${PATH}"
+
+if ! command -v cargo >/dev/null; then
+  echo "FAIL: cargo not found after setup" >&2
+  exit 1
+fi
+
 cd "${HARVEST_ROOT}"
 cargo build --release --bin translate --bin benchmark
 cargo run --bin=translate -- --print-config-path

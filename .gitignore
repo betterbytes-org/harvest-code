@@ -1,3 +1,5 @@
 /config.toml
 /target/
 .vscode/
+/infra/hyak/logs/
+/infra/hyak/state/
