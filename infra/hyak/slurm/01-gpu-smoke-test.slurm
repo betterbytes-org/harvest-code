@@ -22,8 +22,22 @@ nvidia-smi
 module load cuda/12.4.1 2>/dev/null || module load cuda/12.6.3 2>/dev/null || true
 module load coenv/python/3.13.11 2>/dev/null || module load coenv/python/3.11.9 2>/dev/null || true
 
-echo "Python: $(python3 --version)"
+PYVER="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+echo "Python: $(python3 --version) (${PYVER})"
+if [[ "${PYVER%%.*}" -lt 3 ]] || [[ "${PYVER#*.}" -lt 10 ]]; then
+  echo "FAIL: need Python >= 3.10 (got ${PYVER}). Check module load coenv/python." >&2
+  exit 1
+fi
+
 TEST_VENV="${HARVEST_ENVS}/gpu-smoke"
+# Recreate venv if it was built with an older Python
+if [[ -d "${TEST_VENV}" ]]; then
+  VENV_PY="$("${TEST_VENV}/bin/python3" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "0.0")"
+  if [[ "${VENV_PY}" != "${PYVER}" ]]; then
+    echo "Removing stale venv (had Python ${VENV_PY}, want ${PYVER})"
+    rm -rf "${TEST_VENV}"
+  fi
+fi
 if [[ ! -d "${TEST_VENV}" ]]; then
   python3 -m venv "${TEST_VENV}"
   # shellcheck source=/dev/null
