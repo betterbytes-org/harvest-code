@@ -34,7 +34,7 @@ echo "Date: $(date -u)"
 nvidia-smi -L
 
 hyak_harvest_load_modules
-module load llvm/21 2>/dev/null || echo "WARN: llvm/21 not loaded"
+hyak_harvest_load_llvm
 
 # --- Ollama (default HARVEST LLM backend, user-local install) ---
 mkdir -p "${OLLAMA_HOME}/bin" "${OLLAMA_HOME}/lib"
