@@ -25,7 +25,9 @@ source "${HARVEST_INFRA}/scripts/hyak_module_setup.sh"
 export PATH="${CARGO_HOME}/bin:/gscratch/harvest/rithvik/bin:${PATH}"
 export OLLAMA_MODELS="${OLLAMA_HOME}/models"
 export OLLAMA_HOST="127.0.0.1:11434"
-mkdir -p "${OLLAMA_HOME}/models" "${OUTPUT}"
+# Home dir is over quota; run Ollama with a scratch HOME.
+export OLLAMA_RUN_HOME="${OLLAMA_HOME}/run-home"
+mkdir -p "${OLLAMA_RUN_HOME}/.ollama" "${OLLAMA_HOME}/models" "${OUTPUT}"
 
 echo "=== HARVEST quick run on $(hostname -f) ==="
 echo "Date: $(date -u)"
@@ -39,20 +41,32 @@ mkdir -p "${OLLAMA_HOME}/bin" "${OLLAMA_HOME}/lib"
 if [[ ! -x "${OLLAMA_HOME}/bin/ollama" ]]; then
   echo "Installing Ollama to ${OLLAMA_HOME}..."
   curl -fsSL https://ollama.com/download/ollama-linux-amd64.tar.zst \
-    | tar --zstd -xvf - -C "${OLLAMA_HOME}" 2>/dev/null \
-    || { curl -fsSL https://ollama.com/download/ollama-linux-amd64.tar.zst | unzstd | tar -xvf - -C "${OLLAMA_HOME}"; }
+    | tar --zstd -xf - -C "${OLLAMA_HOME}" 2>/dev/null \
+    || { curl -fsSL https://ollama.com/download/ollama-linux-amd64.tar.zst | unzstd | tar -xf - -C "${OLLAMA_HOME}"; }
 fi
 export PATH="${OLLAMA_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${OLLAMA_HOME}/lib/ollama:${OLLAMA_HOME}/lib:${LD_LIBRARY_PATH:-}"
 
-ollama serve >>"${HARVEST_LOGS}/ollama-${SLURM_JOB_ID}.log" 2>&1 &
+ollama_cmd() { HOME="${OLLAMA_RUN_HOME}" OLLAMA_MODELS="${OLLAMA_MODELS}" "$@"; }
+
+ollama_cmd ollama serve >>"${HARVEST_LOGS}/ollama-${SLURM_JOB_ID}.log" 2>&1 &
 OLLAMA_PID=$!
-sleep 5
 
-echo "Pulling codellama:7b (default HARVEST model)..."
-ollama pull codellama:7b
+echo "Waiting for Ollama server..."
+for i in $(seq 1 60); do
+  if curl -sf http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+    break
+  fi
+  sleep 2
+done
+curl -sf http://127.0.0.1:11434/api/tags >/dev/null || { echo "FAIL: Ollama did not start"; tail -20 "${HARVEST_LOGS}/ollama-${SLURM_JOB_ID}.log"; exit 1; }
 
-curl -sf http://127.0.0.1:11434/api/tags >/dev/null
+if ! ollama_cmd ollama list 2>/dev/null | grep -q codellama; then
+  echo "Pulling codellama:7b (default HARVEST model)..."
+  ollama_cmd ollama pull codellama:7b
+else
+  echo "codellama:7b already cached"
+fi
 echo "Ollama ready (PID ${OLLAMA_PID})"
 
 # --- Build HARVEST ---
