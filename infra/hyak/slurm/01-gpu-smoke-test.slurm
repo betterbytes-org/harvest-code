@@ -20,8 +20,9 @@ echo "Date: $(date -u)"
 nvidia-smi
 
 module load cuda/12.4.1 2>/dev/null || module load cuda/12.6.3 2>/dev/null || true
+module load coenv/python/3.13.11 2>/dev/null || module load coenv/python/3.11.9 2>/dev/null || true
 
-# Install torch in a lightweight test venv if not present
+echo "Python: $(python3 --version)"
 TEST_VENV="${HARVEST_ENVS}/gpu-smoke"
 if [[ ! -d "${TEST_VENV}" ]]; then
   python3 -m venv "${TEST_VENV}"

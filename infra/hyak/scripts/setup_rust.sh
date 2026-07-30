@@ -2,7 +2,10 @@
 # Install rustup toolchain on a compute node into scratch (run once).
 set -euo pipefail
 
-source "${HARVEST_INFRA:?}/env/common.env"
+HARVEST_ROOT="${HARVEST_ROOT:-/gscratch/harvest/rithvik/harvest}"
+HARVEST_INFRA="${HARVEST_INFRA:-${HARVEST_ROOT}/infra/hyak}"
+# shellcheck source=/dev/null
+source "${HARVEST_INFRA}/env/common.env"
 
 export RUSTUP_HOME="${HARVEST_ENVS}/rustup"
 export CARGO_HOME="${HARVEST_ENVS}/cargo"

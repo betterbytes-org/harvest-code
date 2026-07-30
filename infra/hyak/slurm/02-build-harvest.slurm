@@ -22,6 +22,7 @@ module load llvm/21 2>/dev/null || {
 }
 
 # Rust toolchain in scratch (see scripts/setup_rust.sh)
+export HARVEST_INFRA="${HARVEST_ROOT}/infra/hyak"
 if [[ ! -x "${CARGO_HOME}/bin/cargo" ]]; then
   echo "Installing Rust toolchain to ${CARGO_HOME}..."
   bash "${HARVEST_INFRA}/scripts/setup_rust.sh"
