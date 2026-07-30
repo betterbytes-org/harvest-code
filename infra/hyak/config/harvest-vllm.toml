@@ -1,0 +1,39 @@
+# HARVEST config for vLLM on Hyak compute nodes (DeepSeek V4 Flash).
+# Install: cp infra/hyak/config/harvest-vllm.toml ~/.config/harvest/config.toml
+# Or pass --config flags; update address after vLLM job starts (see state/vllm-endpoint.env).
+
+[tools.raw_source_to_cargo_llm]
+backend = "openai"
+address = "http://REPLACE_WITH_GPU_NODE:8000/v1"
+model = "deepseek-v4-flash"
+max_tokens = 16384
+
+[tools.modular_translation_llm]
+backend = "openai"
+address = "http://REPLACE_WITH_GPU_NODE:8000/v1"
+model = "deepseek-v4-flash"
+max_tokens = 16384
+
+[tools.fix_declarations_llm]
+backend = "openai"
+address = "http://REPLACE_WITH_GPU_NODE:8000/v1"
+model = "deepseek-v4-flash"
+max_tokens = 16384
+
+[tools.generate_difftest_suite]
+backend = "openai"
+address = "http://REPLACE_WITH_GPU_NODE:8000/v1"
+model = "deepseek-v4-flash"
+max_tokens = 16384
+
+[tools.fix_diff_failures]
+backend = "openai"
+address = "http://REPLACE_WITH_GPU_NODE:8000/v1"
+model = "deepseek-v4-flash"
+max_tokens = 16384
+
+[tools.generate_exec_difftests]
+backend = "openai"
+address = "http://REPLACE_WITH_GPU_NODE:8000/v1"
+model = "deepseek-v4-flash"
+max_tokens = 16384
