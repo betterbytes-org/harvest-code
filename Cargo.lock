@@ -1342,6 +1342,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "generate_exec_difftests"
+version = "0.1.0"
+dependencies = [
+ "full_source",
+ "harvest_core",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1475,6 +1486,7 @@ dependencies = [
  "fix_diff_failures",
  "full_source",
  "generate_difftest_suite",
+ "generate_exec_difftests",
  "harvest_core",
  "libc",
  "load_raw_source",
@@ -1482,6 +1494,7 @@ dependencies = [
  "quantize_rust_spans",
  "raw_source_to_cargo_llm",
  "run_difftest",
+ "run_exec_difftest",
  "serde",
  "serde_json",
  "thiserror",
@@ -2459,6 +2472,20 @@ dependencies = [
  "full_source",
  "generate_difftest_suite",
  "harvest_core",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "run_exec_difftest"
+version = "0.1.0"
+dependencies = [
+ "build_c_artifact",
+ "exec_runner",
+ "full_source",
+ "generate_exec_difftests",
+ "harvest_core",
+ "run_difftest",
  "tempfile",
  "tracing",
 ]
