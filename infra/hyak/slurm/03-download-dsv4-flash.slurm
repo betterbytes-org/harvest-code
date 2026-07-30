@@ -12,8 +12,9 @@
 set -euo pipefail
 
 HARVEST_ROOT="/gscratch/harvest/rithvik/harvest"
+export HARVEST_INFRA="${HARVEST_ROOT}/infra/hyak"
 # shellcheck source=/dev/null
-source "${HARVEST_ROOT}/infra/hyak/env/common.env"
+source "${HARVEST_INFRA}/env/common.env"
 
 echo "=== Download DeepSeek-V4-Flash on $(hostname -f) ==="
 echo "Date: $(date -u)"

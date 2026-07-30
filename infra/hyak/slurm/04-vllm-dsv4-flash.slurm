@@ -21,6 +21,8 @@ echo "Date: $(date -u)"
 echo "Job ID: ${SLURM_JOB_ID}"
 nvidia-smi -L
 
-module load cuda/12.4.1 2>/dev/null || module load cuda/12.6.3 2>/dev/null || true
+# shellcheck source=/dev/null
+source "${HARVEST_INFRA}/scripts/hyak_module_setup.sh"
+hyak_harvest_load_modules
 
 bash "${HARVEST_INFRA}/scripts/start_vllm_background.sh"

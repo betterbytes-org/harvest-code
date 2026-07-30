@@ -20,9 +20,10 @@ echo "Date: $(date -u)"
 nvidia-smi -L
 
 module load cuda/12.4.1 2>/dev/null || module load cuda/12.6.3 2>/dev/null || true
-module load coenv/python/3.13.11 2>/dev/null || module load coenv/python/3.11.9 2>/dev/null || true
-
-echo "Python: $(python3 --version)"
+# shellcheck source=/dev/null
+source "${HARVEST_INFRA}/scripts/hyak_module_setup.sh"
+hyak_harvest_load_modules
+hyak_harvest_require_python
 
 if [[ ! -d "${VLLM_VENV}" ]]; then
   python3 -m venv "${VLLM_VENV}"
