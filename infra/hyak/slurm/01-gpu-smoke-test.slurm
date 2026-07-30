@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=harvest-gpu-smoke
-#SBATCH --account=u_hyak_harvest
+#SBATCH --account=gpu-h200-harvest
 #SBATCH --partition=gpu-h200
 #SBATCH --gres=gpu:h200:2
 #SBATCH --cpus-per-task=4

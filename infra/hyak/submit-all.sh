@@ -4,7 +4,11 @@ set -euo pipefail
 
 HARVEST_ROOT="/gscratch/harvest/rithvik/harvest"
 SLURM_DIR="${HARVEST_ROOT}/infra/hyak/slurm"
-export SLURM_ACCOUNT="${SLURM_ACCOUNT:-u_hyak_harvest}"
+# Override inherited login-node env (e.g. u_hyak_harvest from worker scripts).
+unset SLURM_ACCOUNT HYAK_ACCOUNT SALLOC_ACCOUNT
+export SLURM_ACCOUNT="gpu-h200-harvest"
+export HYAK_ACCOUNT="${SLURM_ACCOUNT}"
+export SALLOC_ACCOUNT="${SLURM_ACCOUNT}"
 
 submit() {
   local script="$1"

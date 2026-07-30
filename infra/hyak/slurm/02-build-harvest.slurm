@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=harvest-build
-#SBATCH --account=u_hyak_harvest
-#SBATCH --partition=compute
+#SBATCH --account=gpu-h200-harvest
+#SBATCH --partition=gpu-h200
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=16G
 #SBATCH --time=02:00:00

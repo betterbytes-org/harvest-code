@@ -5,7 +5,7 @@ or serve LLMs on login nodes.
 
 ## Prerequisites
 
-- Slurm account: `u_hyak_harvest`
+- Slurm account: `gpu-h200-harvest`
 - GPU partition: `gpu-h200` with **2× H200** (`--gres=gpu:h200:2`)
 - Scratch: `/gscratch/harvest/rithvik/`
 
@@ -22,7 +22,7 @@ This submits a dependency chain:
 | Job | Partition | GPUs | Purpose |
 |-----|-----------|------|---------|
 | `01-gpu-smoke-test` | gpu-h200 | 2× H200 | CUDA + matmul sanity check |
-| `02-build-harvest` | compute | 0 | `cargo build --release` |
+| `02-build-harvest` | gpu-h200 | 0 | `cargo build --release` |
 | `00-setup-vllm-env` | gpu-h200 | 2× H200 | Install vLLM + DeepGEMM |
 | `03-download-dsv4-flash` | gpu-h200 | 2× H200 | Cache model weights |
 | `04-vllm-dsv4-flash` | gpu-h200 | 2× H200 | Serve DeepSeek-V4-Flash (long-running) |
@@ -68,7 +68,7 @@ the native FP8 checkpoint (~149 GiB weights + KV cache).
 ## Individual jobs
 
 ```bash
-export SLURM_ACCOUNT=u_hyak_harvest
+export SLURM_ACCOUNT=gpu-h200-harvest
 sbatch slurm/01-gpu-smoke-test.slurm
 sbatch slurm/04-vllm-dsv4-flash.slurm   # after env + download
 ```
@@ -76,6 +76,6 @@ sbatch slurm/04-vllm-dsv4-flash.slurm   # after env + download
 Interactive **compute-node** shell (still not login):
 
 ```bash
-srun --account=u_hyak_harvest --partition=gpu-h200 --gres=gpu:h200:2 \
+srun --account=gpu-h200-harvest --partition=gpu-h200 --gres=gpu:h200:2 \
   --cpus-per-task=8 --mem=64G --time=02:00:00 --pty bash
 ```
