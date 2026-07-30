@@ -46,15 +46,17 @@ hyak_harvest_load_llvm() {
   if [[ "$restore_nounset" -eq 1 ]]; then
     set -u
   fi
-  # Hyak: libclang lives under niac llvm tree (llvm/21 module does not exist here).
   export LIBCLANG_PATH="${LIBCLANG_PATH:-/sw/contrib/niac-src/llvm-project/14.0.3/lib}"
   export LLVM_CONFIG_PATH="${LLVM_CONFIG_PATH:-/sw/contrib/niac-src/llvm-project/14.0.3/bin/llvm-config}"
+  export LD_LIBRARY_PATH="${LIBCLANG_PATH}:${LD_LIBRARY_PATH:-}"
   if [[ ! -f "${LIBCLANG_PATH}/libclang.so" && ! -f "${LIBCLANG_PATH}/libclang.so.13" ]]; then
     echo "FAIL: libclang not found under ${LIBCLANG_PATH}" >&2
     return 1
   fi
   echo "LIBCLANG_PATH=${LIBCLANG_PATH}"
 }
+
+hyak_harvest_require_python() {
   local ver min_major=3 min_minor=10
   ver="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
   echo "Python ${ver}"
