@@ -15,6 +15,7 @@ use fix_declarations_llm::FixDeclarationsLlm;
 use fix_diff_failures::FixDiffFailures;
 use full_source::CargoPackage;
 use generate_difftest_suite::GenerateDiffTestSuite;
+use generate_exec_difftests::GenerateExecDifftests;
 use harvest_core::config::Config;
 use harvest_core::tools::Tool;
 use harvest_core::utils::get_version;
@@ -24,6 +25,7 @@ use modular_translation_llm::ModularTranslationLlm;
 use quantize_rust_spans::QuantizeRustSpans;
 use raw_source_to_cargo_llm::RawSourceToCargoLlm;
 use run_difftest::{DiffTestResult, RunDiffTest};
+use run_exec_difftest::RunExecDiffTest;
 use runner::ToolRunner;
 use scheduler::Scheduler;
 use std::sync::Arc;
@@ -101,18 +103,18 @@ pub fn transpile(config: Arc<Config>) -> Result<HarvestIR, Box<dyn std::error::E
             }
         }
 
-        // Differential testing: for library projects, generate a C test harness that
-        // exercises the public API through both the original C build and the translated
-        // Rust candidate, and repair candidates that fail. Executable projects are not
-        // yet supported (see generate_exec_difftests / run_exec_difftest).
+        // Differential testing: generate a test harness that exercises the public API (for
+        // library projects) or the program's argv/stdin surface (for executables) through
+        // both the original C build and the translated Rust candidate, and repair
+        // candidates that fail.
         let is_library = matches!(
             ir.get::<ProjectSpec>(project_spec)
                 .ok_or("transpile: no ProjectSpec in IR")?
                 .kind,
             ProjectKind::Library
         );
+        let c_artifact = scheduler.queue_after(BuildCArtifact, &[load_src, project_spec]);
         if is_library {
-            let c_artifact = scheduler.queue_after(BuildCArtifact, &[load_src, project_spec]);
             let (pkg, build) = run_diff_test_and_repair(
                 &mut scheduler,
                 &mut runner,
@@ -124,6 +126,21 @@ pub fn transpile(config: Arc<Config>) -> Result<HarvestIR, Box<dyn std::error::E
                 current_build_id,
                 || GenerateDiffTestSuite,
                 || RunDiffTest,
+            )?;
+            current_pkg_id = pkg;
+            current_build_id = build;
+        } else {
+            let (pkg, build) = run_diff_test_and_repair(
+                &mut scheduler,
+                &mut runner,
+                &mut ir,
+                &config,
+                load_src,
+                c_artifact,
+                current_pkg_id,
+                current_build_id,
+                || GenerateExecDifftests,
+                || RunExecDiffTest,
             )?;
             current_pkg_id = pkg;
             current_build_id = build;
