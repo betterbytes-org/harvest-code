@@ -29,7 +29,9 @@ MODEL_DIR="${HARVEST_MODELS}/DeepSeek-V4-Flash-0731"
 
 huggingface-cli download "${VLLM_MODEL}" \
   --local-dir "${MODEL_DIR}" \
-  --local-dir-use-symlinks False
+  --local-dir-use-symlinks False 2>/dev/null \
+|| hf download "${VLLM_MODEL}" \
+  --local-dir "${MODEL_DIR}"
 
 du -sh "${MODEL_DIR}" "${HF_HOME}"
 echo "=== Model download complete: ${MODEL_DIR} ==="
