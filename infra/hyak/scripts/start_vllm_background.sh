@@ -6,17 +6,28 @@ source "${HARVEST_INFRA:?}/env/common.env"
 # shellcheck source=/dev/null
 source "${VLLM_VENV}/bin/activate"
 
+# Optional secrets and rate-limit overrides
+[[ -f "${HARVEST_INFRA}/env/secrets.env" ]] && source "${HARVEST_INFRA}/env/secrets.env"
+[[ -f "${HARVEST_INFRA}/env/rate-limit.env" ]] && source "${HARVEST_INFRA}/env/rate-limit.env"
+
+if [[ -z "${VLLM_API_KEY:-}" ]]; then
+  echo "FAIL: VLLM_API_KEY not set. Copy env/secrets.env.example to env/secrets.env" >&2
+  exit 1
+fi
+export VLLM_API_KEY
+
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1}"
 export VLLM_ENGINE_READY_TIMEOUT_S="${VLLM_ENGINE_READY_TIMEOUT_S:-7200}"
 
 NODE="$(hostname -s)"
 ENDPOINT_FILE="${HARVEST_STATE}/vllm-endpoint.env"
 LOG_FILE="${HARVEST_LOGS}/vllm-${SLURM_JOB_ID:-local}.log"
+PROXY_LOG="${HARVEST_LOGS}/vllm-proxy-${SLURM_JOB_ID:-local}.log"
 
 vllm serve "${VLLM_MODEL}" \
   --served-model-name "${VLLM_SERVED_NAME}" \
-  --host 0.0.0.0 \
-  --port "${VLLM_PORT}" \
+  --host 127.0.0.1 \
+  --port "${VLLM_INTERNAL_PORT}" \
   --tensor-parallel-size "${VLLM_TP_SIZE}" \
   --enable-expert-parallel \
   --trust-remote-code \
@@ -26,6 +37,9 @@ vllm serve "${VLLM_MODEL}" \
   --reasoning-parser deepseek_v4 \
   --kv-cache-dtype fp8 \
   --block-size 256 \
+  --moe-backend deep_gemm_mega_moe \
+  --attention-config '{"use_fp4_indexer_cache": true}' \
+  --speculative-config '{"method":"dspark","num_speculative_tokens":7,"draft_sample_method":"greedy"}' \
   --max-model-len 32768 \
   --max-num-seqs 4 \
   --max-num-batched-tokens 8192 \
@@ -36,7 +50,16 @@ vllm serve "${VLLM_MODEL}" \
 VLLM_PID=$!
 echo "${VLLM_PID}" >"${HARVEST_STATE}/vllm.pid"
 
-bash "${HARVEST_INFRA}/scripts/wait_for_vllm.sh" "127.0.0.1" "${VLLM_PORT}" 7200
+bash "${HARVEST_INFRA}/scripts/wait_for_vllm.sh" "127.0.0.1" "${VLLM_INTERNAL_PORT}" 7200
+
+python3 "${HARVEST_INFRA}/scripts/vllm_api_proxy.py" >>"${PROXY_LOG}" 2>&1 &
+PROXY_PID=$!
+echo "${PROXY_PID}" >"${HARVEST_STATE}/vllm-proxy.pid"
+
+# Proxy must be up before writing endpoint
+sleep 1
+curl -sf "http://127.0.0.1:${VLLM_PORT}/v1/models" \
+  -H "Authorization: Bearer ${VLLM_API_KEY}" >/dev/null
 
 cat >"${ENDPOINT_FILE}" <<EOF
 # Written by start_vllm_background.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -46,10 +69,17 @@ VLLM_ENDPOINT=http://${NODE}:${VLLM_PORT}/v1
 VLLM_SERVED_NAME=${VLLM_SERVED_NAME}
 SLURM_JOB_ID=${SLURM_JOB_ID:-}
 VLLM_PID=${VLLM_PID}
+PROXY_PID=${PROXY_PID}
+RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED}
+RATE_LIMIT_REQUESTS_PER_MINUTE=${RATE_LIMIT_REQUESTS_PER_MINUTE}
+RATE_LIMIT_BURST=${RATE_LIMIT_BURST}
+# Clients: Authorization: Bearer \$VLLM_API_KEY
+# OpenAI SDK: base_url=http://${NODE}:${VLLM_PORT}/v1  api_key=<key>  model=${VLLM_SERVED_NAME}
 EOF
 
-echo "vLLM ready: ${ENDPOINT_FILE}"
-echo "PID ${VLLM_PID}, log ${LOG_FILE}"
+echo "vLLM ready (internal 127.0.0.1:${VLLM_INTERNAL_PORT}, proxy 0.0.0.0:${VLLM_PORT})"
+echo "Endpoint: ${ENDPOINT_FILE}"
+echo "vLLM PID ${VLLM_PID}, proxy PID ${PROXY_PID}"
 
 # Keep the allocation alive serving requests.
 wait "${VLLM_PID}"
