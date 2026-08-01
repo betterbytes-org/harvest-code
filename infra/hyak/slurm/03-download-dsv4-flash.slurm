@@ -16,7 +16,7 @@ export HARVEST_INFRA="${HARVEST_ROOT}/infra/hyak"
 # shellcheck source=/dev/null
 source "${HARVEST_INFRA}/env/common.env"
 
-echo "=== Download DeepSeek-V4-Flash on $(hostname -f) ==="
+echo "=== Download DeepSeek-V4-Flash-0731 on $(hostname -f) ==="
 echo "Date: $(date -u)"
 echo "HF_HOME=${HF_HOME}"
 echo "Model: ${VLLM_MODEL}"
@@ -24,9 +24,12 @@ echo "Model: ${VLLM_MODEL}"
 # shellcheck source=/dev/null
 source "${VLLM_VENV}/bin/activate"
 
+MODEL_DIR="${HARVEST_MODELS}/DeepSeek-V4-Flash-0731"
+[[ -f "${HARVEST_INFRA}/env/secrets.env" ]] && source "${HARVEST_INFRA}/env/secrets.env"
+
 huggingface-cli download "${VLLM_MODEL}" \
-  --local-dir "${HARVEST_MODELS}/DeepSeek-V4-Flash" \
+  --local-dir "${MODEL_DIR}" \
   --local-dir-use-symlinks False
 
-du -sh "${HARVEST_MODELS}/DeepSeek-V4-Flash" "${HF_HOME}"
-echo "=== Model download complete ==="
+du -sh "${MODEL_DIR}" "${HF_HOME}"
+echo "=== Model download complete: ${MODEL_DIR} ==="
