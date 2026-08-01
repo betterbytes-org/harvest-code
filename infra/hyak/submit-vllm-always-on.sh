@@ -4,6 +4,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 export SLURM_ACCOUNT="${SLURM_ACCOUNT:-gpu-h200-harvest}"
+export HYAK_ACCOUNT="${SLURM_ACCOUNT}"
 
 echo "=== Always-on DeepSeek-V4-Flash-0731 API ==="
 echo "Prerequisites:"

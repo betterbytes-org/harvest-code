@@ -25,6 +25,12 @@ source "${HARVEST_INFRA}/scripts/hyak_module_setup.sh"
 hyak_harvest_load_modules
 hyak_harvest_require_python
 
+# Home dir is over quota; use scratch for pip builds and caches.
+export TMPDIR="${HARVEST_SCRATCH}/tmp"
+export PIP_CACHE_DIR="${HARVEST_ENVS}/pip-cache"
+export HOME="${HARVEST_SCRATCH}/run-home"
+mkdir -p "${TMPDIR}" "${PIP_CACHE_DIR}" "${HOME}"
+
 if [[ ! -d "${VLLM_VENV}" ]]; then
   python3 -m venv "${VLLM_VENV}"
 fi
