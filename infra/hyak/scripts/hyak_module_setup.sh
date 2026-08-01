@@ -33,31 +33,37 @@ hyak_harvest_load_modules() {
 }
 
 hyak_harvest_load_python_vllm() {
-  if ! command -v module >/dev/null 2>&1; then
-    echo "ERROR: environment modules unavailable" >&2
-    return 1
+  if command -v module >/dev/null 2>&1; then
+    local restore_nounset=0
+    if [[ $- == *u* ]]; then
+      restore_nounset=1
+      set +u
+    fi
+    module load gcc/13.2.0 cuda/12.4.1 2>/dev/null || module load gcc cuda
+    if [[ "$restore_nounset" -eq 1 ]]; then
+      set -u
+    fi
   fi
-  local restore_nounset=0
-  if [[ $- == *u* ]]; then
-    restore_nounset=1
-    set +u
-  fi
-  module load gcc/13.2.0 cuda/12.4.1 2>/dev/null || module load gcc cuda
-  local mod loaded=0
-  for mod in python3/3.12.3 python3/3.12.1 coenv/python/3.11.9; do
-    if module load "$mod" 2>/dev/null; then
-      echo "Loaded ${mod}"
-      loaded=1
+
+  # Hyak coenv/python modules are missing _ctypes on compute nodes; use miniforge.
+  local candidates=(
+    "${HARVEST_PYTHON312:-}"
+    "/mmfs1/sw/miniforge3/25.9.1-0/bin/python3.12"
+    "/mmfs1/sw/ondemand/miniconda3/bin/python3.12"
+  )
+  local py=""
+  for cand in "${candidates[@]}"; do
+    [[ -z "$cand" ]] && continue
+    if [[ -x "$cand" ]] && "$cand" -c "import ctypes" 2>/dev/null; then
+      py="$cand"
       break
     fi
   done
-  if [[ "$restore_nounset" -eq 1 ]]; then
-    set -u
-  fi
-  if [[ "$loaded" -eq 0 ]]; then
-    echo "FAIL: could not load Python 3.12/3.11 module" >&2
+  if [[ -z "$py" ]]; then
+    echo "FAIL: no working Python 3.12+ with ctypes found" >&2
     return 1
   fi
+  export PATH="$(dirname "$py"):${PATH}"
   python3 -c "import ctypes; print('ctypes OK')"
   hyak_harvest_require_python
   echo "python3: $(command -v python3) ($(python3 --version))"
