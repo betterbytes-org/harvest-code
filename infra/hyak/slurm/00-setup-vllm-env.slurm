@@ -19,13 +19,11 @@ echo "=== Setup vLLM env on compute node $(hostname -f) ==="
 echo "Date: $(date -u)"
 nvidia-smi -L
 
-module load cuda/12.4.1 2>/dev/null || module load cuda/12.6.3 2>/dev/null || true
-module load gcc/13.2.0 2>/dev/null || true
-module load python3/3.12.3 2>/dev/null || module load python3/3.12.1
+# shellcheck source=/dev/null
+source "${HARVEST_INFRA}/scripts/hyak_module_setup.sh"
+hyak_harvest_load_python_vllm
 
 PY=$(command -v python3)
-echo "Using Python: $PY ($($PY -c 'import sys; print(sys.version)'))"
-$PY -c "import ctypes; print('ctypes OK')"
 
 # Home dir is over quota; use scratch for pip builds and caches.
 export TMPDIR="${HARVEST_SCRATCH}/tmp"
@@ -33,7 +31,7 @@ export PIP_CACHE_DIR="${HARVEST_ENVS}/pip-cache"
 export HOME="${HARVEST_SCRATCH}/run-home"
 mkdir -p "${TMPDIR}" "${PIP_CACHE_DIR}" "${HOME}"
 
-# Recreate venv if it was built with a broken Python (e.g. coenv 3.13 missing _ctypes).
+# Recreate venv if it was built with a broken Python.
 if [[ -d "${VLLM_VENV}" ]]; then
   if ! "${VLLM_VENV}/bin/python3" -c "import ctypes, vllm" 2>/dev/null; then
     echo "Removing broken vLLM venv at ${VLLM_VENV}"

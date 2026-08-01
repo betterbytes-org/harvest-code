@@ -32,6 +32,37 @@ hyak_harvest_load_modules() {
   echo "python3: $(command -v python3) ($(python3 --version))"
 }
 
+hyak_harvest_load_python_vllm() {
+  if ! command -v module >/dev/null 2>&1; then
+    echo "ERROR: environment modules unavailable" >&2
+    return 1
+  fi
+  local restore_nounset=0
+  if [[ $- == *u* ]]; then
+    restore_nounset=1
+    set +u
+  fi
+  module load gcc/13.2.0 cuda/12.4.1 2>/dev/null || module load gcc cuda
+  local mod loaded=0
+  for mod in python3/3.12.3 python3/3.12.1 coenv/python/3.11.9; do
+    if module load "$mod" 2>/dev/null; then
+      echo "Loaded ${mod}"
+      loaded=1
+      break
+    fi
+  done
+  if [[ "$restore_nounset" -eq 1 ]]; then
+    set -u
+  fi
+  if [[ "$loaded" -eq 0 ]]; then
+    echo "FAIL: could not load Python 3.12/3.11 module" >&2
+    return 1
+  fi
+  python3 -c "import ctypes; print('ctypes OK')"
+  hyak_harvest_require_python
+  echo "python3: $(command -v python3) ($(python3 --version))"
+}
+
 hyak_harvest_load_llvm() {
   if ! command -v module >/dev/null 2>&1; then
     return 1
