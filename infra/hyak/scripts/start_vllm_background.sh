@@ -10,6 +10,13 @@ source "${VLLM_VENV}/bin/activate"
 [[ -f "${HARVEST_INFRA}/env/secrets.env" ]] && source "${HARVEST_INFRA}/env/secrets.env"
 [[ -f "${HARVEST_INFRA}/env/rate-limit.env" ]] && source "${HARVEST_INFRA}/env/rate-limit.env"
 
+# Home dir is over quota; keep vLLM/HF caches on scratch.
+export HOME="${HARVEST_SCRATCH}/run-home"
+export XDG_CACHE_HOME="${HARVEST_SCRATCH}/cache"
+export VLLM_CACHE_ROOT="${HARVEST_SCRATCH}/cache/vllm"
+export HF_HOME="${HF_HOME:-${HARVEST_MODELS}/huggingface}"
+mkdir -p "${HOME}" "${XDG_CACHE_HOME}" "${VLLM_CACHE_ROOT}"
+
 if [[ -z "${VLLM_API_KEY:-}" ]]; then
   echo "FAIL: VLLM_API_KEY not set. Copy env/secrets.env.example to env/secrets.env" >&2
   exit 1
@@ -37,9 +44,6 @@ vllm serve "${VLLM_MODEL}" \
   --reasoning-parser deepseek_v4 \
   --kv-cache-dtype fp8 \
   --block-size 256 \
-  --moe-backend deep_gemm_mega_moe \
-  --attention-config '{"use_fp4_indexer_cache": true}' \
-  --speculative-config '{"method":"dspark","num_speculative_tokens":7,"draft_sample_method":"greedy"}' \
   --max-model-len 32768 \
   --max-num-seqs 4 \
   --max-num-batched-tokens 8192 \
