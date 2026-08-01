@@ -3,3 +3,5 @@
 .vscode/
 /infra/hyak/logs/
 /infra/hyak/state/
+infra/hyak/env/secrets.env
+infra/hyak/env/rate-limit.env
