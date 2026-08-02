@@ -8,10 +8,14 @@ TIMEOUT="${3:-3600}"
 
 deadline=$((SECONDS + TIMEOUT))
 url="http://${HOST}:${PORT}/v1/models"
+auth=()
+if [[ -n "${VLLM_API_KEY:-}" ]]; then
+  auth=(-H "Authorization: Bearer ${VLLM_API_KEY}")
+fi
 
 echo "Waiting for vLLM at ${url} (timeout ${TIMEOUT}s)..."
 while (( SECONDS < deadline )); do
-  if curl -sf "${url}" >/dev/null 2>&1; then
+  if curl -sf "${url}" "${auth[@]}" >/dev/null 2>&1; then
     echo "vLLM ready at ${url}"
     exit 0
   fi

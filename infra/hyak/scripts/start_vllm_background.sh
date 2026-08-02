@@ -21,7 +21,9 @@ if [[ -z "${VLLM_API_KEY:-}" ]]; then
   echo "FAIL: VLLM_API_KEY not set. Copy env/secrets.env.example to env/secrets.env" >&2
   exit 1
 fi
-export VLLM_API_KEY
+PROXY_API_KEY="${VLLM_API_KEY}"
+# Auth + rate limits live on the proxy; internal vLLM stays localhost-only.
+unset VLLM_API_KEY
 
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1}"
 export VLLM_ENGINE_READY_TIMEOUT_S="${VLLM_ENGINE_READY_TIMEOUT_S:-7200}"
@@ -56,6 +58,7 @@ echo "${VLLM_PID}" >"${HARVEST_STATE}/vllm.pid"
 
 bash "${HARVEST_INFRA}/scripts/wait_for_vllm.sh" "127.0.0.1" "${VLLM_INTERNAL_PORT}" 7200
 
+export VLLM_API_KEY="${PROXY_API_KEY}"
 python3 "${HARVEST_INFRA}/scripts/vllm_api_proxy.py" >>"${PROXY_LOG}" 2>&1 &
 PROXY_PID=$!
 echo "${PROXY_PID}" >"${HARVEST_STATE}/vllm-proxy.pid"
