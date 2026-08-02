@@ -59,6 +59,17 @@ echo "${VLLM_PID}" >"${HARVEST_STATE}/vllm.pid"
 bash "${HARVEST_INFRA}/scripts/wait_for_vllm.sh" "127.0.0.1" "${VLLM_INTERNAL_PORT}" 7200
 
 export VLLM_API_KEY="${PROXY_API_KEY}"
+
+if [[ -f "${HARVEST_STATE}/vllm-proxy.pid" ]]; then
+  old_proxy_pid="$(cat "${HARVEST_STATE}/vllm-proxy.pid" 2>/dev/null || true)"
+  if [[ -n "${old_proxy_pid}" ]]; then
+    kill "${old_proxy_pid}" 2>/dev/null || true
+  fi
+fi
+if command -v fuser >/dev/null 2>&1; then
+  fuser -k "${VLLM_PORT}/tcp" 2>/dev/null || true
+fi
+
 python3 "${HARVEST_INFRA}/scripts/vllm_api_proxy.py" >>"${PROXY_LOG}" 2>&1 &
 PROXY_PID=$!
 echo "${PROXY_PID}" >"${HARVEST_STATE}/vllm-proxy.pid"

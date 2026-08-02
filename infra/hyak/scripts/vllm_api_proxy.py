@@ -14,6 +14,7 @@ from typing import ClassVar, Dict, Optional, Set
 
 class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
+    allow_reuse_address = True
 
 
 def _env_bool(name: str, default: bool) -> bool:
