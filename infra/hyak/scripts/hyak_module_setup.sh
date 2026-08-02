@@ -14,7 +14,8 @@ hyak_harvest_load_modules() {
     restore_nounset=1
     set +u
   fi
-  module load gcc/13.2.0 cuda/12.4.1 2>/dev/null || module load gcc cuda
+  # DeepGEMM JIT requires NVCC >= 12.9 (fp8 kv-cache on DeepSeek V4).
+  module load gcc/13.2.0 cuda/12.9.1 2>/dev/null || module load gcc/13.2.0 cuda/12.4.1 2>/dev/null || module load gcc cuda
   for mod in coenv/python/3.13.11 python3/3.12.3 python3/3.12.1 coenv/python/3.11.9; do
     if module load "$mod" 2>/dev/null; then
       echo "Loaded ${mod}"
@@ -39,7 +40,7 @@ hyak_harvest_load_python_vllm() {
       restore_nounset=1
       set +u
     fi
-    module load gcc/13.2.0 cuda/12.4.1 2>/dev/null || module load gcc cuda
+    module load gcc/13.2.0 cuda/12.9.1 2>/dev/null || module load gcc/13.2.0 cuda/12.4.1 2>/dev/null || module load gcc cuda
     if [[ "$restore_nounset" -eq 1 ]]; then
       set -u
     fi
