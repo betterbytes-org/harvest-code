@@ -15,7 +15,7 @@ proxy with API key auth before reaching vLLM.
 cat /gscratch/harvest/rithvik/harvest/infra/hyak/state/vllm-endpoint.env
 ```
 
-Look for `VLLM_HOST` and `VLLM_PORT` (default 18080).
+Look for `VLLM_HOST` and `VLLM_PROXY_PORT` (default 18080; `VLLM_PORT` in endpoint is an alias).
 
 ## Connect (SSH tunnel)
 

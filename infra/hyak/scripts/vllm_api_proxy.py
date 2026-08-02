@@ -167,7 +167,7 @@ class VllmProxyHandler(BaseHTTPRequestHandler):
 
 def main() -> int:
     listen_host = os.environ.get("VLLM_PROXY_HOST", "0.0.0.0")
-    listen_port = int(os.environ.get("VLLM_PORT", "8000"))
+    listen_port = int(os.environ.get("VLLM_PROXY_PORT", os.environ.get("VLLM_PORT", "18080")))
     VllmProxyHandler.backend_port = int(os.environ.get("VLLM_INTERNAL_PORT", "8001"))
 
     api_key = os.environ.get("VLLM_API_KEY", "")

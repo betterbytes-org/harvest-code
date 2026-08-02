@@ -24,6 +24,8 @@ fi
 PROXY_API_KEY="${VLLM_API_KEY}"
 # Auth + rate limits live on the proxy; internal vLLM stays localhost-only.
 unset VLLM_API_KEY
+# vLLM uses VLLM_PORT for NCCL rendezvous (default 8000 when API is on 8001).
+unset VLLM_PORT
 
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1}"
 export VLLM_ENGINE_READY_TIMEOUT_S="${VLLM_ENGINE_READY_TIMEOUT_S:-7200}"
@@ -59,18 +61,12 @@ echo "${VLLM_PID}" >"${HARVEST_STATE}/vllm.pid"
 bash "${HARVEST_INFRA}/scripts/wait_for_vllm.sh" "127.0.0.1" "${VLLM_INTERNAL_PORT}" 7200
 
 export VLLM_API_KEY="${PROXY_API_KEY}"
+export VLLM_PROXY_PORT
 
 if [[ -f "${HARVEST_STATE}/vllm-proxy.pid" ]]; then
   old_proxy_pid="$(cat "${HARVEST_STATE}/vllm-proxy.pid" 2>/dev/null || true)"
   if [[ -n "${old_proxy_pid}" ]]; then
     kill "${old_proxy_pid}" 2>/dev/null || true
-  fi
-fi
-if command -v fuser >/dev/null 2>&1; then
-  if fuser "${VLLM_PORT}/tcp" >/dev/null 2>&1; then
-    echo "WARN: port ${VLLM_PORT} in use; attempting to free it" >&2
-    fuser -k "${VLLM_PORT}/tcp" 2>/dev/null || true
-    sleep 1
   fi
 fi
 
@@ -80,14 +76,15 @@ echo "${PROXY_PID}" >"${HARVEST_STATE}/vllm-proxy.pid"
 
 # Proxy must be up before writing endpoint
 sleep 1
-curl -sf "http://127.0.0.1:${VLLM_PORT}/v1/models" \
+curl -sf "http://127.0.0.1:${VLLM_PROXY_PORT}/v1/models" \
   -H "Authorization: Bearer ${VLLM_API_KEY}" >/dev/null
 
 cat >"${ENDPOINT_FILE}" <<EOF
 # Written by start_vllm_background.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
 VLLM_HOST=${NODE}
-VLLM_PORT=${VLLM_PORT}
-VLLM_ENDPOINT=http://${NODE}:${VLLM_PORT}/v1
+VLLM_PORT=${VLLM_PROXY_PORT}
+VLLM_PROXY_PORT=${VLLM_PROXY_PORT}
+VLLM_ENDPOINT=http://${NODE}:${VLLM_PROXY_PORT}/v1
 VLLM_SERVED_NAME=${VLLM_SERVED_NAME}
 SLURM_JOB_ID=${SLURM_JOB_ID:-}
 VLLM_PID=${VLLM_PID}
@@ -96,10 +93,10 @@ RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED}
 RATE_LIMIT_REQUESTS_PER_MINUTE=${RATE_LIMIT_REQUESTS_PER_MINUTE}
 RATE_LIMIT_BURST=${RATE_LIMIT_BURST}
 # Clients: Authorization: Bearer \$VLLM_API_KEY
-# OpenAI SDK: base_url=http://${NODE}:${VLLM_PORT}/v1  api_key=<key>  model=${VLLM_SERVED_NAME}
+# OpenAI SDK: base_url=http://${NODE}:${VLLM_PROXY_PORT}/v1  api_key=<key>  model=${VLLM_SERVED_NAME}
 EOF
 
-echo "vLLM ready (internal 127.0.0.1:${VLLM_INTERNAL_PORT}, proxy 0.0.0.0:${VLLM_PORT})"
+echo "vLLM ready (internal 127.0.0.1:${VLLM_INTERNAL_PORT}, proxy 0.0.0.0:${VLLM_PROXY_PORT})"
 echo "Endpoint: ${ENDPOINT_FILE}"
 echo "vLLM PID ${VLLM_PID}, proxy PID ${PROXY_PID}"
 

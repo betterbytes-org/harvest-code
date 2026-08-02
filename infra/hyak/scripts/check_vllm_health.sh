@@ -12,7 +12,8 @@ if [[ -z "${VLLM_API_KEY:-}" ]]; then
   exit 1
 fi
 
-URL="http://${VLLM_HOST:-127.0.0.1}:${VLLM_PORT:-8000}/v1/models"
+PROXY_PORT="${VLLM_PROXY_PORT:-${VLLM_PORT:-18080}}"
+URL="http://${VLLM_HOST:-127.0.0.1}:${PROXY_PORT}/v1/models"
 if curl -sf "${URL}" -H "Authorization: Bearer ${VLLM_API_KEY}" >/dev/null; then
   echo "OK: vLLM proxy healthy at ${URL}"
   exit 0
