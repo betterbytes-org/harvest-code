@@ -67,7 +67,11 @@ if [[ -f "${HARVEST_STATE}/vllm-proxy.pid" ]]; then
   fi
 fi
 if command -v fuser >/dev/null 2>&1; then
-  fuser -k "${VLLM_PORT}/tcp" 2>/dev/null || true
+  if fuser "${VLLM_PORT}/tcp" >/dev/null 2>&1; then
+    echo "WARN: port ${VLLM_PORT} in use; attempting to free it" >&2
+    fuser -k "${VLLM_PORT}/tcp" 2>/dev/null || true
+    sleep 1
+  fi
 fi
 
 python3 "${HARVEST_INFRA}/scripts/vllm_api_proxy.py" >>"${PROXY_LOG}" 2>&1 &

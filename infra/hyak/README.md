@@ -91,7 +91,7 @@ Recommended production sizing is 4× H200; your 2-GPU setup is a tight fit for
 the native FP8 checkpoint (~149 GiB weights + KV cache).
 
 **Architecture:** vLLM listens on `127.0.0.1:8001` (internal). A Python proxy on
-`0.0.0.0:8080` handles API key auth and per-key rate limiting before forwarding.
+`0.0.0.0:18080` handles API key auth and per-key rate limiting before forwarding.
 
 ## Individual jobs
 

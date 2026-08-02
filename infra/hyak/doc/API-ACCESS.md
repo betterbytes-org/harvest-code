@@ -15,14 +15,14 @@ proxy with API key auth before reaching vLLM.
 cat /gscratch/harvest/rithvik/harvest/infra/hyak/state/vllm-endpoint.env
 ```
 
-Look for `VLLM_HOST` and `VLLM_PORT` (default 8080).
+Look for `VLLM_HOST` and `VLLM_PORT` (default 18080).
 
 ## Connect (SSH tunnel)
 
 From your laptop:
 
 ```bash
-ssh -L 8080:<COMPUTE_NODE>:8080 <user>@hyak.uw.edu
+ssh -L 18080:<COMPUTE_NODE>:18080 <user>@hyak.uw.edu
 ```
 
 Replace `<COMPUTE_NODE>` with `VLLM_HOST` from the endpoint file.
@@ -30,7 +30,7 @@ Replace `<COMPUTE_NODE>` with `VLLM_HOST` from the endpoint file.
 ## Call the API
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:18080/v1/chat/completions \
   -H "Authorization: Bearer <VLLM_API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -46,7 +46,7 @@ curl http://localhost:8080/v1/chat/completions \
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:8080/v1",  # via SSH tunnel
+    base_url="http://localhost:18080/v1",  # via SSH tunnel
     api_key="<VLLM_API_KEY>",
 )
 
