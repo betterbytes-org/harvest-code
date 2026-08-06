@@ -23,12 +23,16 @@ source "${HARVEST_INFRA}/env/common.env"
 # shellcheck source=/dev/null
 source "${HARVEST_INFRA}/scripts/hyak_module_setup.sh"
 
-export PATH="${OLLAMA_HOME}/bin:${CARGO_HOME}/bin:${PATH}"
+export PATH="${CARGO_HOME}/bin:${OLLAMA_HOME}/bin:${PATH}"
 export LD_LIBRARY_PATH="${OLLAMA_HOME}/lib/ollama:${OLLAMA_HOME}/lib:${LD_LIBRARY_PATH:-}"
 export OLLAMA_MODELS="${OLLAMA_HOME}/models"
 export OLLAMA_HOST="127.0.0.1:11434"
 
 hyak_harvest_load_llvm
+
+command -v cargo >/dev/null || { echo "FAIL: cargo not on PATH (${CARGO_HOME}/bin)"; exit 1; }
+command -v rustc >/dev/null || { echo "FAIL: rustc not on PATH"; exit 1; }
+echo "cargo: $(command -v cargo) ($(cargo --version))"
 
 [[ -x "${HARVEST_ROOT}/target/release/translate" ]] || { echo "FAIL: translate binary missing"; exit 1; }
 
