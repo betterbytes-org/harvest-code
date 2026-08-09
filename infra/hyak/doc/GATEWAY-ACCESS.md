@@ -12,7 +12,9 @@ auth, per-key rate limits (RPM/TPM), usage tracking, and an admin UI. The gatewa
 | Virtual key (`sk-...`) | Individual developers / teams | OpenAI-compatible API calls (`/v1/chat/completions`, etc.) |
 
 **Do not** share the master key with developers or use it in client code. Issue each
-user or team a virtual key with its own RPM/TPM limits.
+user or team a virtual key with its own RPM/TPM limits. Default bootstrap limits are
+**60 RPM** / **100k TPM** (see `env/gateway.env.example` and
+`gateway/bootstrap_admin.sh`). When exceeded, LiteLLM returns HTTP **429**.
 
 ## Admin UI
 
@@ -77,3 +79,29 @@ Gateway is NOT on public internet by design.
 
 Developers use their **virtual key** (not the master key) with the OpenAI-compatible
 endpoint. See `doc/API-ACCESS.md` for curl and Python examples.
+
+## Rollback to stdlib proxy
+
+If LiteLLM or Postgres is misbehaving, disable the gateway and fall back to the
+legacy stdlib proxy (`scripts/vllm_api_proxy.py` on port **18080**):
+
+1. Set in `env/gateway.env` (copy from `env/gateway.env.example` if needed):
+
+   ```bash
+   export GATEWAY_ENABLED=false
+   ```
+
+2. Ensure `VLLM_API_KEY` is set in `env/secrets.env` (required when the gateway is off).
+
+3. Cancel and resubmit job **04** (or restart `scripts/start_vllm_background.sh` on the
+   compute node).
+
+4. Clients use the shared `VLLM_API_KEY` and `VLLM_PROXY_PORT` (default 18080) from
+   `state/vllm-endpoint.env`. Rate limits use `env/rate-limit.env` instead of
+   per-key LiteLLM limits.
+
+Verify proxy unit tests locally:
+
+```bash
+python3 infra/hyak/scripts/test_vllm_api_proxy.py
+```

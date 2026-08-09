@@ -38,6 +38,9 @@ User guide: `doc/API-ACCESS.md`. Admin / keys: `doc/GATEWAY-ACCESS.md`.
 
 **Virtual keys:** admins issue per-user keys via UI or `gateway/bootstrap_admin.sh` (default 60 RPM).
 
+**Rollback:** set `GATEWAY_ENABLED=false` in `env/gateway.env` and resubmit job **04** to
+use the legacy stdlib proxy on port 18080 (see `doc/GATEWAY-ACCESS.md`).
+
 ## Quick start (full HARVEST pipeline)
 
 ```bash
