@@ -1,37 +1,48 @@
 # DeepSeek-V4-Flash-0731 API Access
 
-Shared inference endpoint on Hyak H200 GPUs. Requests go through a rate-limited
-proxy with API key auth before reaching vLLM.
+Shared inference endpoint on Hyak H200 GPUs. Requests go through the **LiteLLM
+gateway** (auth, per-key rate limits, usage tracking) before reaching vLLM.
 
 ## Prerequisites
 
 - UW Hyak account with access to the harvest GPU allocation
-- `VLLM_API_KEY` (ask the server admin)
+- A **virtual key** from the gateway admin (see `doc/GATEWAY-ACCESS.md`)
 - SSH access to Hyak
 
 ## Find the endpoint
 
 ```bash
-cat /gscratch/harvest/rithvik/harvest/infra/hyak/state/vllm-endpoint.env
+cat /gscratch/harvest/rithvik/harvest/infra/hyak/state/gateway-endpoint.env
 ```
 
-Look for `VLLM_HOST` and `VLLM_PROXY_PORT` (default 18080; `VLLM_PORT` in endpoint is an alias).
+Look for `GATEWAY_HOST` and `LITELLM_PORT` (default **4000**). The legacy
+`state/vllm-endpoint.env` is also written and mirrors the same host/port when the
+gateway is enabled.
 
 ## Connect (SSH tunnel)
 
 From your laptop:
 
 ```bash
-ssh -L 18080:<COMPUTE_NODE>:18080 <user>@hyak.uw.edu
+source /gscratch/harvest/rithvik/harvest/infra/hyak/state/gateway-endpoint.env
+ssh -L ${LITELLM_PORT}:${GATEWAY_HOST}:${LITELLM_PORT} <user>@hyak.uw.edu
 ```
 
-Replace `<COMPUTE_NODE>` with `VLLM_HOST` from the endpoint file.
+Replace values from the endpoint file if you prefer not to source it. Example with
+default port:
+
+```bash
+ssh -L 4000:<GATEWAY_HOST>:4000 <user>@hyak.uw.edu
+```
 
 ## Call the API
 
+Use your **virtual key** (`sk-...`), not the admin master key:
+
 ```bash
-curl http://localhost:18080/v1/chat/completions \
-  -H "Authorization: Bearer <VLLM_API_KEY>" \
+source /gscratch/harvest/rithvik/harvest/infra/hyak/state/gateway-endpoint.env
+curl "http://localhost:${LITELLM_PORT}/v1/chat/completions" \
+  -H "Authorization: Bearer <YOUR_VIRTUAL_KEY>" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "deepseek-v4-flash-0731",
@@ -45,9 +56,10 @@ curl http://localhost:18080/v1/chat/completions \
 ```python
 from openai import OpenAI
 
+# After: ssh -L 4000:<GATEWAY_HOST>:4000 <user>@hyak.uw.edu
 client = OpenAI(
-    base_url="http://localhost:18080/v1",  # via SSH tunnel
-    api_key="<VLLM_API_KEY>",
+    base_url="http://localhost:4000/v1",  # match LITELLM_PORT from gateway-endpoint.env
+    api_key="<YOUR_VIRTUAL_KEY>",
 )
 
 resp = client.chat.completions.create(
@@ -59,32 +71,35 @@ print(resp.choices[0].message.content)
 
 ## Rate limits
 
-Default: **60 requests/minute** per API key, burst **10**. Admins can change
-limits without restarting vLLM by editing `env/rate-limit.env` and restarting
-the server job:
+LiteLLM enforces **per virtual key** limits (RPM/TPM) set when the key is created.
+Default bootstrap key (`harvest-devs`): **60 requests/minute**, **100k tokens/minute**.
 
-```bash
-export RATE_LIMIT_ENABLED=true
-export RATE_LIMIT_REQUESTS_PER_MINUTE=60
-export RATE_LIMIT_BURST=10
-```
+Admins can adjust limits in the UI (Virtual Keys → edit) or when generating keys via
+`gateway/bootstrap_admin.sh`. When rate limited, the API returns HTTP **429**.
 
-When rate limited, the API returns HTTP **429** with `Retry-After: 60`.
-
-To disable rate limiting (auth still required):
-
-```bash
-export RATE_LIMIT_ENABLED=false
-```
+Legacy stdlib proxy mode (`GATEWAY_ENABLED=false`) still uses `env/rate-limit.env`;
+the always-on path uses LiteLLM with `GATEWAY_ENABLED=true` (default in
+`env/gateway.env.example`).
 
 ## Security notes
 
 - Hyak compute nodes are not internet-facing; use SSH tunnel or campus VPN.
-- The API key is shared-team auth, not per-user identity.
-- Do not commit `secrets.env` to git.
+- Virtual keys identify usage per key; the master key is admin-only.
+- Do not commit `secrets.env` or `state/virtual-keys.json` to git.
 
 ## Health check
 
 ```bash
-bash /gscratch/harvest/rithvik/harvest/infra/hyak/scripts/check_vllm_health.sh
+bash /gscratch/harvest/rithvik/harvest/infra/hyak/scripts/test_litellm_gateway.sh
 ```
+
+Or manually:
+
+```bash
+source /gscratch/harvest/rithvik/harvest/infra/hyak/state/gateway-endpoint.env
+curl "http://localhost:${LITELLM_PORT}/health/readiness"
+```
+
+## Admin / gateway docs
+
+See `doc/GATEWAY-ACCESS.md` for admin UI, virtual key issuance, and usage statistics.
