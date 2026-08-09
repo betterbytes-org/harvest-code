@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Install LiteLLM proxy + Python deps into HARVEST scratch venv.
+# Expects hyak_harvest_load_python_vllm (or equivalent) to have set python3 on PATH.
 set -euo pipefail
 
 source "${HARVEST_INFRA:?}/env/common.env"
@@ -11,36 +12,6 @@ export TMPDIR="${HARVEST_SCRATCH}/tmp"
 export PIP_CACHE_DIR="${HARVEST_ENVS}/pip-cache"
 mkdir -p "${TMPDIR}" "${PIP_CACHE_DIR}"
 
-# Hyak coenv python modules lack _ctypes on compute nodes; prefer miniforge.
-litellm_find_python() {
-  local candidates=(
-    "${HARVEST_PYTHON312:-}"
-    "/mmfs1/sw/miniforge3/25.9.1-0/bin/python3.12"
-    "/mmfs1/sw/ondemand/miniconda3/bin/python3.12"
-  )
-  local cand py=""
-  for cand in "${candidates[@]}"; do
-    [[ -z "$cand" ]] && continue
-    if [[ -x "$cand" ]] && "$cand" -c "import ctypes" 2>/dev/null; then
-      py="$cand"
-      break
-    fi
-  done
-  if [[ -z "$py" ]]; then
-    module load python/3.12 2>/dev/null || true
-    if python3 -c "import ctypes" 2>/dev/null; then
-      py="$(command -v python3)"
-    fi
-  fi
-  if [[ -z "$py" ]]; then
-    echo "FAIL: no working Python 3.12+ with ctypes found" >&2
-    return 1
-  fi
-  echo "$py"
-}
-
-PY="$(litellm_find_python)"
-
 # Recreate venv if it was built with a broken Python.
 if [[ -d "${LITELLM_VENV}" ]]; then
   if ! "${LITELLM_VENV}/bin/python" -c "import ctypes" 2>/dev/null; then
@@ -50,7 +21,7 @@ if [[ -d "${LITELLM_VENV}" ]]; then
 fi
 
 if [[ ! -x "${LITELLM_VENV}/bin/python" ]]; then
-  "${PY}" -m venv "${LITELLM_VENV}"
+  python3 -m venv "${LITELLM_VENV}"
 fi
 
 # shellcheck source=/dev/null
@@ -64,4 +35,4 @@ if module avail postgresql 2>&1 | grep -q postgresql; then
 fi
 
 echo "LiteLLM venv ready at ${LITELLM_VENV}"
-litellm --version || pip show litellm | grep Version
+python -c "import litellm, psycopg2; print('ok')"
