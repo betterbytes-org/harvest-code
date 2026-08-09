@@ -46,8 +46,8 @@ user or team a virtual key with its own RPM/TPM limits. Default bootstrap limits
 
 ```bash
 export HARVEST_INFRA=/gscratch/harvest/rithvik/harvest/infra/hyak
-bash infra/hyak/gateway/bootstrap_admin.sh
-cat infra/hyak/state/virtual-keys.json
+bash "$HARVEST_INFRA/gateway/bootstrap_admin.sh"
+cat "$HARVEST_INFRA/state/virtual-keys.json"
 ```
 
 Distribute the `key` field to developers out-of-band. Do not commit `virtual-keys.json`.
@@ -60,7 +60,9 @@ Distribute the `key` field to developers out-of-band. Do not commit `virtual-key
 Example (via tunnel):
 
 ```bash
-source /gscratch/harvest/rithvik/harvest/infra/hyak/state/gateway-endpoint.env
+export HARVEST_INFRA=/gscratch/harvest/rithvik/harvest/infra/hyak
+source "$HARVEST_INFRA/state/gateway-endpoint.env"
+source "$HARVEST_INFRA/env/secrets.env"
 curl "http://localhost:${LITELLM_PORT}/user/daily/activity" \
   -H "Authorization: Bearer ${LITELLM_MASTER_KEY}"
 ```
