@@ -72,7 +72,9 @@ bash "${HARVEST_INFRA}/scripts/wait_for_vllm.sh" "127.0.0.1" "${VLLM_INTERNAL_PO
 
 if [[ "${GATEWAY_ENABLED}" == "true" ]]; then
   export LITELLM_MASTER_KEY LITELLM_SALT_KEY
-  eval "$(bash "${HARVEST_INFRA}/gateway/start_postgres.sh" | grep ^DATABASE_URL=)"
+  PG_OUT=$(bash "${HARVEST_INFRA}/gateway/start_postgres.sh") || exit 1
+  DATABASE_URL=$(echo "$PG_OUT" | grep ^DATABASE_URL= | cut -d= -f2-)
+  [[ -n "$DATABASE_URL" ]] || exit 1
   export DATABASE_URL
   bash "${HARVEST_INFRA}/gateway/start_litellm.sh"
   PUBLIC_PORT="${LITELLM_PORT}"

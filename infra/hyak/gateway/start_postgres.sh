@@ -78,9 +78,12 @@ for _ in $(seq 1 30); do
 done
 pg_isready -h 127.0.0.1 -p "${HARVEST_PGPORT}"
 
-# Role/database match DATABASE_URL in common.env (trust auth on localhost)
-createuser -h 127.0.0.1 -p "${HARVEST_PGPORT}" -s litellm 2>/dev/null || true
+# Role/database match DATABASE_URL in common.env.
+# Trust auth (--auth=trust) is safe only on node-local 127.0.0.1 within a Slurm allocation
+# (no cross-node exposure; each job gets an isolated compute node).
+createuser -h 127.0.0.1 -p "${HARVEST_PGPORT}" litellm 2>/dev/null || true
 createdb -h 127.0.0.1 -p "${HARVEST_PGPORT}" -O litellm litellm 2>/dev/null || true
+psql -h 127.0.0.1 -p "${HARVEST_PGPORT}" -d postgres -c "ALTER DATABASE litellm OWNER TO litellm" 2>/dev/null || true
 
 export DATABASE_URL="postgresql://litellm@127.0.0.1:${HARVEST_PGPORT}/litellm"
 echo "DATABASE_URL=${DATABASE_URL}"
