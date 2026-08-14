@@ -52,6 +52,18 @@ if [[ ! -f "${HARVEST_PGDATA}/PG_VERSION" ]]; then
   cat >> "${HARVEST_PGDATA}/postgresql.conf" <<EOF
 listen_addresses = '127.0.0.1'
 port = ${HARVEST_PGPORT}
+# GPFS-backed PGDATA: skip full fsync so prisma migrate cannot stall for hours.
+synchronous_commit = off
+fsync = off
+full_page_writes = off
+EOF
+fi
+
+if ! grep -q '^synchronous_commit' "${HARVEST_PGDATA}/postgresql.conf"; then
+  cat >> "${HARVEST_PGDATA}/postgresql.conf" <<EOF
+synchronous_commit = off
+fsync = off
+full_page_writes = off
 EOF
 fi
 
@@ -69,14 +81,14 @@ else
   [[ -f "${HARVEST_PGDATA}/postmaster.pid" ]] && head -1 "${HARVEST_PGDATA}/postmaster.pid" > "${PIDFILE}"
 fi
 
-# Wait for readiness
+# Wait for readiness (db postgres, not the OS username).
 for _ in $(seq 1 30); do
-  if pg_isready -h 127.0.0.1 -p "${HARVEST_PGPORT}" >/dev/null 2>&1; then
+  if pg_isready -h 127.0.0.1 -p "${HARVEST_PGPORT}" -d postgres >/dev/null 2>&1; then
     break
   fi
   sleep 1
 done
-pg_isready -h 127.0.0.1 -p "${HARVEST_PGPORT}"
+pg_isready -h 127.0.0.1 -p "${HARVEST_PGPORT}" -d postgres
 
 # Role/database match DATABASE_URL in common.env.
 # Trust auth (--auth=trust) is safe only on node-local 127.0.0.1 within a Slurm allocation
@@ -86,4 +98,5 @@ createdb -h 127.0.0.1 -p "${HARVEST_PGPORT}" -O litellm litellm 2>/dev/null || t
 psql -h 127.0.0.1 -p "${HARVEST_PGPORT}" -d postgres -c "ALTER DATABASE litellm OWNER TO litellm" 2>/dev/null || true
 
 export DATABASE_URL="postgresql://litellm@127.0.0.1:${HARVEST_PGPORT}/litellm"
+echo "${DATABASE_URL}" > "${HARVEST_STATE}/database.url"
 echo "DATABASE_URL=${DATABASE_URL}"

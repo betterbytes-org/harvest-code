@@ -72,11 +72,16 @@ bash "${HARVEST_INFRA}/scripts/wait_for_vllm.sh" "127.0.0.1" "${VLLM_INTERNAL_PO
 
 if [[ "${GATEWAY_ENABLED}" == "true" ]]; then
   export LITELLM_MASTER_KEY LITELLM_SALT_KEY
-  PG_OUT=$(bash "${HARVEST_INFRA}/gateway/start_postgres.sh") || exit 1
-  DATABASE_URL=$(echo "$PG_OUT" | grep ^DATABASE_URL= | cut -d= -f2-)
-  [[ -n "$DATABASE_URL" ]] || exit 1
-  export DATABASE_URL
-  bash "${HARVEST_INFRA}/gateway/start_litellm.sh"
+  # Never tear down vLLM if the gateway fails; retry until LiteLLM is healthy.
+  if ! bash "${HARVEST_INFRA}/gateway/bring_up.sh"; then
+    echo "WARN: LiteLLM gateway failed to start; retrying in background (vLLM stays up)" >&2
+    (
+      while true; do
+        sleep 30
+        bash "${HARVEST_INFRA}/gateway/bring_up.sh" && exit 0
+      done
+    ) >>"${HARVEST_LOGS}/gateway-retry-${SLURM_JOB_ID:-local}.log" 2>&1 &
+  fi
   PUBLIC_PORT="${LITELLM_PORT}"
   GATEWAY_MODE="litellm"
   PROXY_PID=""
@@ -104,38 +109,13 @@ else
 fi
 
 if [[ "${GATEWAY_MODE}" == "litellm" ]]; then
-  cat >"${ENDPOINT_FILE}" <<EOF
-# Written by start_vllm_background.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
-VLLM_HOST=${NODE}
-VLLM_PORT=${PUBLIC_PORT}
-VLLM_PROXY_PORT=${PUBLIC_PORT}
-VLLM_ENDPOINT=http://${NODE}:${PUBLIC_PORT}/v1
-VLLM_SERVED_NAME=${VLLM_SERVED_NAME}
-SLURM_JOB_ID=${SLURM_JOB_ID:-}
-VLLM_PID=${VLLM_PID}
-PROXY_PID=${PROXY_PID}
-GATEWAY_MODE=${GATEWAY_MODE}
-RATE_LIMIT_ENABLED=${RATE_LIMIT_ENABLED}
-RATE_LIMIT_REQUESTS_PER_MINUTE=${RATE_LIMIT_REQUESTS_PER_MINUTE}
-RATE_LIMIT_BURST=${RATE_LIMIT_BURST}
-# Clients: Authorization: Bearer <virtual-key> (create in LiteLLM UI at LITELLM_UI_URL)
-# OpenAI SDK: base_url=http://${NODE}:${PUBLIC_PORT}/v1  api_key=<virtual-key>  model=${VLLM_SERVED_NAME}
-EOF
-
-  cat >"${GATEWAY_ENDPOINT_FILE}" <<EOF
-# Written by start_vllm_background.sh on $(date -u +%Y-%m-%dT%H:%M:%SZ)
-GATEWAY_HOST=${NODE}
-LITELLM_PORT=${PUBLIC_PORT}
-LITELLM_UI_URL=http://${NODE}:${PUBLIC_PORT}/ui
-GATEWAY_MODE=${GATEWAY_MODE}
-SLURM_JOB_ID=${SLURM_JOB_ID:-}
-# Admin UI: open LITELLM_UI_URL, login with LITELLM_MASTER_KEY
-# API: Authorization: Bearer <virtual-key>  base_url=http://${NODE}:${PUBLIC_PORT}/v1
-EOF
-
-  echo "vLLM ready (internal 127.0.0.1:${VLLM_INTERNAL_PORT}, LiteLLM 0.0.0.0:${PUBLIC_PORT})"
-  echo "Endpoint: ${ENDPOINT_FILE}"
-  echo "Gateway: ${GATEWAY_ENDPOINT_FILE}"
+  if [[ -f "${GATEWAY_ENDPOINT_FILE}" ]]; then
+    echo "vLLM ready (internal 127.0.0.1:${VLLM_INTERNAL_PORT}, LiteLLM 0.0.0.0:${PUBLIC_PORT})"
+    echo "Endpoint: ${ENDPOINT_FILE}"
+    echo "Gateway: ${GATEWAY_ENDPOINT_FILE}"
+  else
+    echo "vLLM ready (internal 127.0.0.1:${VLLM_INTERNAL_PORT}); LiteLLM not yet healthy"
+  fi
   echo "vLLM PID ${VLLM_PID}"
 else
   cat >"${ENDPOINT_FILE}" <<EOF

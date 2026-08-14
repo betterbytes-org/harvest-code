@@ -5,23 +5,41 @@ gateway** (auth, per-key rate limits, usage tracking) before reaching vLLM.
 
 ## Prerequisites
 
-- UW Hyak account with access to the harvest GPU allocation
-- A **virtual key** from the gateway admin (see `doc/GATEWAY-ACCESS.md`)
-- SSH access to Hyak
+- A **virtual key** (issued when job **04** starts; also in `env/secrets.env` as `LITELLM_VIRTUAL_KEY`)
+- For the public URL: nothing else (Cloudflare quick tunnel)
+- For the SSH path: UW Hyak SSH login
 
 ## Find the endpoint
 
 ```bash
+cat /gscratch/harvest/rithvik/harvest/infra/hyak/state/public-url.env
 cat /gscratch/harvest/rithvik/harvest/infra/hyak/state/gateway-endpoint.env
 ```
 
-Look for `GATEWAY_HOST` and `LITELLM_PORT` (default **4000**). The legacy
-`state/vllm-endpoint.env` is also written and mirrors the same host/port when the
-gateway is enabled.
+`PUBLIC_URL` is the HTTPS address an outside user should call. `GATEWAY_HOST` / `LITELLM_PORT` are the on-cluster bind.
+
+## Outside users (no Hyak SSH)
+
+Job **04** starts a Cloudflare quick tunnel next to LiteLLM. Share `PUBLIC_API` and the virtual key:
+
+```bash
+source /gscratch/harvest/rithvik/harvest/infra/hyak/state/public-url.env
+curl "${PUBLIC_API}/chat/completions" \
+  -H "Authorization: Bearer <YOUR_VIRTUAL_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-v4-flash-0731",
+    "messages": [{"role": "user", "content": "Hello"}],
+    "max_tokens": 64
+  }'
+```
+
+Dashboard: `${PUBLIC_UI}` (login with `LITELLM_MASTER_KEY`). The `trycloudflare.com` hostname changes when the job restarts.
 
 ## Connect (SSH tunnel)
 
-From your laptop:
+Hyak GPU nodes are not on the public internet. Anyone with a Hyak SSH login can
+reach the gateway with a local tunnel, then use only the virtual API key:
 
 ```bash
 source /gscratch/harvest/rithvik/harvest/infra/hyak/state/gateway-endpoint.env
@@ -34,6 +52,10 @@ default port:
 ```bash
 ssh -L 4000:<GATEWAY_HOST>:4000 <user>@hyak.uw.edu
 ```
+
+From a Hyak login node you can skip the tunnel and call `http://${GATEWAY_HOST}:${LITELLM_PORT}` directly.
+
+The virtual key is in `state/virtual-keys.json` (field `key`) after job **04** finishes starting LiteLLM. Do not use the master key in client code.
 
 ## Call the API
 

@@ -12,6 +12,7 @@
 #SBATCH --error=/gscratch/harvest/rithvik/harvest/infra/hyak/logs/vllm-dsv4-%j.err
 
 set -euo pipefail
+export PYTHONUNBUFFERED=1
 
 HARVEST_ROOT="/gscratch/harvest/rithvik/harvest"
 export HARVEST_INFRA="${HARVEST_ROOT}/infra/hyak"

@@ -36,7 +36,9 @@ User guide: `doc/API-ACCESS.md`. Admin / keys: `doc/GATEWAY-ACCESS.md`.
 
 **HF token:** optional (model is public/MIT). Set `HF_TOKEN` in `secrets.env` if downloads rate-limit.
 
-**Virtual keys:** admins issue per-user keys via UI or `gateway/bootstrap_admin.sh` (default 60 RPM).
+**Virtual keys:** job **04** auto-issues `harvest-external` via `gateway/bootstrap_admin.sh` into `state/virtual-keys.json` (60 RPM). Admins can mint more keys in the UI.
+
+**External access:** job **04** publishes a Cloudflare quick tunnel URL in `state/public-url.env`. Outside users call `${PUBLIC_API}` with the virtual key. Hyak SSH tunnel still works as a fallback.
 
 **Rollback:** set `GATEWAY_ENABLED=false` in `env/gateway.env` and resubmit job **04** to
 use the legacy stdlib proxy on port 18080 (see `doc/GATEWAY-ACCESS.md`).
