@@ -34,7 +34,22 @@ curl "${PUBLIC_API}/chat/completions" \
   }'
 ```
 
-Dashboard: `${PUBLIC_UI}` (login with `LITELLM_MASTER_KEY`). The `trycloudflare.com` hostname changes when the job restarts.
+Dashboard: `${PUBLIC_UI}` (login with `LITELLM_MASTER_KEY`).
+
+`*.trycloudflare.com` is a **Cloudflare Quick Tunnel**, not DDNS. The GPU node has
+no public IP, so `cloudflared` opens an outbound tunnel and Cloudflare assigns a
+random hostname. That name changes when the Slurm job or tunnel restarts — not
+because a Hyak IP is "dynamic" in the DDNS sense (compute IPs are private and
+the node itself also changes across jobs). A `cs.washington.edu` or personal
+domain is better: create a **named** Cloudflare tunnel, CNAME the domain at it,
+and set `CLOUDFLARE_TUNNEL_TOKEN` + `PUBLIC_NAMED_URL` in `env/secrets.env`.
+
+## OpenCode
+
+OpenCode defaults `max_tokens` to ~32000 if `limit.output` is unset. This model's
+context is 32768 (input + output), so that overflows. Copy
+`examples/opencode.json` and set `HARVEST_API_KEY`. The gateway also clamps
+oversized `max_tokens` so other clients do not hit the same 400.
 
 ## Connect (SSH tunnel)
 

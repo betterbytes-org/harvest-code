@@ -6,3 +6,5 @@
 infra/hyak/env/secrets.env
 infra/hyak/env/rate-limit.env
 infra/hyak/state/virtual-keys.json
+__pycache__/
+*.py[cod]

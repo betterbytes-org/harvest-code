@@ -5,6 +5,12 @@ model_list:
       model: hosted_vllm/deepseek-v4-flash-0731
       api_base: http://127.0.0.1:8001/v1
       api_key: "not-needed-localhost"
+    model_info:
+      # vLLM --max-model-len=32768 (input + output). OpenCode defaults
+      # max_tokens to ~32000 if limit.output is unset, which overflows.
+      max_input_tokens: 32768
+      max_output_tokens: 8192
+      max_tokens: 32768
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
@@ -15,3 +21,4 @@ general_settings:
 litellm_settings:
   drop_params: true
   set_verbose: false
+  callbacks: clamp_max_tokens.proxy_handler_instance

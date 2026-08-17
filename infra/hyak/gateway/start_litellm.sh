@@ -15,6 +15,8 @@ source "${HARVEST_INFRA:?}/env/common.env"
 export HOME="${HARVEST_SCRATCH}/run-home"
 export TMPDIR="${HARVEST_SCRATCH}/tmp"
 export PYTHONUNBUFFERED=1
+export PYTHONPATH="${HARVEST_INFRA}/gateway${PYTHONPATH:+:${PYTHONPATH}}"
+export VLLM_MAX_MODEL_LEN="${VLLM_MAX_MODEL_LEN:-32768}"
 mkdir -p "${HOME}" "${TMPDIR}"
 if [[ -x "${HARVEST_ENVS}/nodejs/bin/node" ]]; then
   export PATH="${HARVEST_ENVS}/nodejs/bin:${PATH}"

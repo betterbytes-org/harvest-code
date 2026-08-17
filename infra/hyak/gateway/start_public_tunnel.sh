@@ -16,6 +16,7 @@ BIN="${HARVEST_ENVS}/bin/cloudflared"
 LOG="${HARVEST_LOGS}/cloudflared-${SLURM_JOB_ID:-local}.log"
 PIDFILE="${HARVEST_STATE}/cloudflared.pid"
 OUT="${HARVEST_STATE}/public-url.env"
+[[ -f "${HARVEST_INFRA}/env/secrets.env" ]] && source "${HARVEST_INFRA}/env/secrets.env"
 
 if [[ ! -x "${BIN}" ]]; then
   echo "Downloading cloudflared ..."
@@ -30,21 +31,29 @@ if [[ -f "${PIDFILE}" ]]; then
 fi
 : > "${LOG}"
 
-"${BIN}" tunnel --no-autoupdate --url "${TARGET}" >>"${LOG}" 2>&1 &
-echo $! > "${PIDFILE}"
-
-URL=""
-for _ in $(seq 1 60); do
-  URL="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare.com' "${LOG}" 2>/dev/null | head -1 || true)"
-  if [[ -n "${URL}" ]]; then
-    break
+# Named Cloudflare tunnel (stable hostname / cs.washington.edu or personal domain).
+# Quick tunnel (*.trycloudflare.com) is a random hostname, not DDNS — it changes
+# every job restart because Hyak nodes have no public IP.
+if [[ -n "${CLOUDFLARE_TUNNEL_TOKEN:-}" ]]; then
+  "${BIN}" tunnel --no-autoupdate run --token "${CLOUDFLARE_TUNNEL_TOKEN}" >>"${LOG}" 2>&1 &
+  echo $! > "${PIDFILE}"
+  URL="${PUBLIC_NAMED_URL:?Set PUBLIC_NAMED_URL (https://your.domain) when using CLOUDFLARE_TUNNEL_TOKEN}"
+else
+  "${BIN}" tunnel --no-autoupdate --url "${TARGET}" >>"${LOG}" 2>&1 &
+  echo $! > "${PIDFILE}"
+  URL=""
+  for _ in $(seq 1 60); do
+    URL="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare.com' "${LOG}" 2>/dev/null | head -1 || true)"
+    if [[ -n "${URL}" ]]; then
+      break
+    fi
+    sleep 1
+  done
+  if [[ -z "${URL}" ]]; then
+    echo "FAIL: cloudflared did not print a public URL (see ${LOG})" >&2
+    tail -n 40 "${LOG}" >&2 || true
+    exit 1
   fi
-  sleep 1
-done
-if [[ -z "${URL}" ]]; then
-  echo "FAIL: cloudflared did not print a public URL (see ${LOG})" >&2
-  tail -n 40 "${LOG}" >&2 || true
-  exit 1
 fi
 
 cat >"${OUT}" <<EOF

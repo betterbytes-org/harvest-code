@@ -58,7 +58,7 @@ vllm serve "${VLLM_MODEL}" \
   --reasoning-parser deepseek_v4 \
   --kv-cache-dtype fp8 \
   --block-size 256 \
-  --max-model-len 32768 \
+  --max-model-len "${VLLM_MAX_MODEL_LEN}" \
   --max-num-seqs 4 \
   --max-num-batched-tokens 8192 \
   --gpu-memory-utilization 0.92 \

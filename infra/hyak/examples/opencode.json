@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "harvest/deepseek-v4-flash-0731",
+  "provider": {
+    "harvest": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "HARVEST Hyak",
+      "options": {
+        "baseURL": "https://isle-repeated-north-surprised.trycloudflare.com/v1",
+        "apiKey": "{env:HARVEST_API_KEY}"
+      },
+      "models": {
+        "deepseek-v4-flash-0731": {
+          "name": "DeepSeek V4 Flash (Hyak)",
+          "limit": {
+            "context": 32768,
+            "output": 8192
+          }
+        }
+      }
+    }
+  }
+}
