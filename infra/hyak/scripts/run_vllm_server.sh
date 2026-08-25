@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Launch DeepSeek V4 Flash via vLLM on 2x H200 (TP=2).
+# Launch official Qwen3.8-27B via vLLM on 2x H200 (TP=2, YaRN 1M).
 set -euo pipefail
 
 source "${HARVEST_INFRA:?}/env/common.env"
@@ -9,6 +9,8 @@ source "${VLLM_VENV}/bin/activate"
 
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1}"
 export VLLM_ENGINE_READY_TIMEOUT_S="${VLLM_ENGINE_READY_TIMEOUT_S:-7200}"
+export VLLM_ALLOW_LONG_MAX_MODEL_LEN="${VLLM_ALLOW_LONG_MAX_MODEL_LEN:-1}"
+HF_OVERRIDES="$(cat "${VLLM_HF_OVERRIDES_FILE}")"
 
 NODE="$(hostname -s)"
 ENDPOINT_FILE="${HARVEST_STATE}/vllm-endpoint.env"
@@ -27,24 +29,23 @@ echo "=== vLLM server starting on ${NODE}:${VLLM_PORT} ==="
 echo "Endpoint file: ${ENDPOINT_FILE}"
 nvidia-smi -L
 
-# 2x H200 (282 GiB total). Native FP8 checkpoint ~149 GiB; TP=2 + EP fits with
-# conservative context. Reduce max-model-len if OOM during load.
+# 2x H200. Official Qwen3.8-27B, YaRN 1M, TP=2.
 exec vllm serve "${VLLM_MODEL}" \
   --served-model-name "${VLLM_SERVED_NAME}" \
   --host 0.0.0.0 \
   --port "${VLLM_PORT}" \
   --tensor-parallel-size "${VLLM_TP_SIZE}" \
-  --enable-expert-parallel \
   --trust-remote-code \
-  --tokenizer-mode deepseek_v4 \
-  --tool-call-parser deepseek_v4 \
   --enable-auto-tool-choice \
-  --reasoning-parser deepseek_v4 \
+  --tool-call-parser qwen3_coder \
+  --reasoning-parser qwen3 \
+  --mm-encoder-tp-mode data \
   --kv-cache-dtype fp8 \
-  --block-size 256 \
-  --max-model-len 32768 \
-  --max-num-seqs 4 \
+  --max-model-len "${VLLM_MAX_MODEL_LEN}" \
+  --max-num-seqs "${VLLM_MAX_NUM_SEQS}" \
   --max-num-batched-tokens 8192 \
-  --gpu-memory-utilization 0.92 \
+  --gpu-memory-utilization 0.90 \
   --enable-chunked-prefill \
+  --enable-prefix-caching \
+  --hf-overrides "${HF_OVERRIDES}" \
   2>&1 | tee -a "${LOG_FILE}"

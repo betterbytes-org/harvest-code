@@ -38,6 +38,12 @@ unset VLLM_PORT
 
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1}"
 export VLLM_ENGINE_READY_TIMEOUT_S="${VLLM_ENGINE_READY_TIMEOUT_S:-7200}"
+export VLLM_ALLOW_LONG_MAX_MODEL_LEN="${VLLM_ALLOW_LONG_MAX_MODEL_LEN:-1}"
+if [[ ! -s "${VLLM_HF_OVERRIDES_FILE}" ]]; then
+  echo "FAIL: YaRN overrides missing: ${VLLM_HF_OVERRIDES_FILE}" >&2
+  exit 1
+fi
+HF_OVERRIDES="$(cat "${VLLM_HF_OVERRIDES_FILE}")"
 
 NODE="$(hostname -s)"
 ENDPOINT_FILE="${HARVEST_STATE}/vllm-endpoint.env"
@@ -45,24 +51,25 @@ GATEWAY_ENDPOINT_FILE="${HARVEST_STATE}/gateway-endpoint.env"
 LOG_FILE="${HARVEST_LOGS}/vllm-${SLURM_JOB_ID:-local}.log"
 PROXY_LOG="${HARVEST_LOGS}/vllm-proxy-${SLURM_JOB_ID:-local}.log"
 
+# Official Qwen3.8-27B at 1M via YaRN. Same LiteLLM path as DeepSeek.
 vllm serve "${VLLM_MODEL}" \
   --served-model-name "${VLLM_SERVED_NAME}" \
   --host 127.0.0.1 \
   --port "${VLLM_INTERNAL_PORT}" \
   --tensor-parallel-size "${VLLM_TP_SIZE}" \
-  --enable-expert-parallel \
   --trust-remote-code \
-  --tokenizer-mode deepseek_v4 \
-  --tool-call-parser deepseek_v4 \
   --enable-auto-tool-choice \
-  --reasoning-parser deepseek_v4 \
+  --tool-call-parser qwen3_coder \
+  --reasoning-parser qwen3 \
+  --mm-encoder-tp-mode data \
   --kv-cache-dtype fp8 \
-  --block-size 256 \
   --max-model-len "${VLLM_MAX_MODEL_LEN}" \
-  --max-num-seqs 4 \
+  --max-num-seqs "${VLLM_MAX_NUM_SEQS}" \
   --max-num-batched-tokens 8192 \
-  --gpu-memory-utilization 0.92 \
+  --gpu-memory-utilization 0.90 \
   --enable-chunked-prefill \
+  --enable-prefix-caching \
+  --hf-overrides "${HF_OVERRIDES}" \
   >>"${LOG_FILE}" 2>&1 &
 
 VLLM_PID=$!
@@ -78,6 +85,10 @@ if [[ "${GATEWAY_ENABLED}" == "true" ]]; then
     (
       while true; do
         sleep 30
+        if curl -sf "http://127.0.0.1:${LITELLM_PORT}/health/readiness" >/dev/null 2>&1; then
+          bash "${HARVEST_INFRA}/gateway/start_public_tunnel.sh" || true
+          exit 0
+        fi
         bash "${HARVEST_INFRA}/gateway/bring_up.sh" && exit 0
       done
     ) >>"${HARVEST_LOGS}/gateway-retry-${SLURM_JOB_ID:-local}.log" 2>&1 &
