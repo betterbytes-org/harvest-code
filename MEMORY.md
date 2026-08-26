@@ -2,23 +2,39 @@
 
 ## Where We Left Off
 
-Job `38514770` on `g3129` is serving via Cloudflare quick tunnel
-`https://isle-repeated-north-surprised.trycloudflare.com`. OpenCode 400 was
-`max_tokens=32000` + ~769 prompt on a 32768 context. Fix: LiteLLM
-`clamp_max_tokens` hook + `examples/opencode.json` with `limit.output: 8192`.
-LiteLLM must be restarted on the job node for the hook to load.
+APC job **38852790** RUNNING on **g3129**. Tunnel:
+`https://kathy-buck-when-excluded.trycloudflare.com` (2026-08-25T23:32:55Z).
+`enable_prefix_caching=True`, KV 6,233,763 tokens. Old **38809797** cancelled
+only. Dreamer jobs left alone. Do not rotate `LITELLM_VIRTUAL_KEY`. Do not
+drop LiteLLM Postgres.
 
 ## Decisions
 
-- Client key: `sk-harvest-ext-9K2mQ7nP4wX8vL3bC6tY` (not the master key).
-- `*.trycloudflare.com` is a Quick Tunnel (random hostname), not DDNS. Named
-  tunnel + cs.washington.edu/personal domain is the stable option.
+- Same LiteLLM, same served name `qwen3.8-27b`.
+- 1M concurrency: KV pool ~6.26M tokens; cap **4** (`VLLM_MAX_NUM_SEQS`).
+- APC: vLLM 0.26 defaults hybrid APC off; we now pass `--enable-prefix-caching`.
+  Same GPU KV pool (no extra HBM allocation).
+- Quick tunnel is **not** a stable hostname.
+- Do not drop the LiteLLM Postgres DB (mentor UI admin lives there).
+- Do not start a second serve job while another job holds PGDATA.
+
+## Credentials (saved)
+
+- Disk (`infra/hyak/env/secrets.env`, gitignored): master, salt, client
+  virtual key `sk-Uzr2bvSJGxEhrWsX2xPzoA`, vLLM internal key.
+- Client key also in `state/virtual-keys.json` (alias `harvest-external`).
+- Mentor LiteLLM UI admin: **Postgres only** at
+  `/gscratch/harvest/rithvik/pgdata/litellm`.
+- Named Cloudflare token: **not saved** (never set).
 
 ## Next step
 
-`srun --jobid=38514770 --overlap bash infra/hyak/scripts/restart_litellm.sh`
-then retest OpenCode with `examples/opencode.json`.
+APC job is live. Handoff: `PROGRESS.md`. Optional: named Cloudflare
+tunnel (`hyak.harvest.hurrypeng.cc`); writeup.
 
 ## Tentative
 
-- Home quota exceeded on login; this worker's Shell often fails to spawn.
+- Shell on login01 private workers often fails to spawn; login03 exec works.
+- APC off on 38809797: `enable_prefix_caching=False`; 0.0% prefix hits.
+- Submitted 38852790 at 2026-08-25 ~23:12Z from klone-login03 after adding
+  `--enable-prefix-caching`.
