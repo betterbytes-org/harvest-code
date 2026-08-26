@@ -38,3 +38,6 @@ tunnel (`hyak.harvest.hurrypeng.cc`); writeup.
 - APC off on 38809797: `enable_prefix_caching=False`; 0.0% prefix hits.
 - Submitted 38852790 at 2026-08-25 ~23:12Z from klone-login03 after adding
   `--enable-prefix-caching`.
+- Cache-read tokens missing: vLLM emits `prompt_tokens_details: null` unless
+  `--enable-prompt-tokens-details`. Flag added to serve scripts; live job
+  not restarted.

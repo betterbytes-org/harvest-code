@@ -47,5 +47,6 @@ exec vllm serve "${VLLM_MODEL}" \
   --gpu-memory-utilization 0.90 \
   --enable-chunked-prefill \
   --enable-prefix-caching \
+  --enable-prompt-tokens-details \
   --hf-overrides "${HF_OVERRIDES}" \
   2>&1 | tee -a "${LOG_FILE}"

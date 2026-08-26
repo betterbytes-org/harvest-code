@@ -48,6 +48,12 @@ Job 04: `slurm/04-vllm-dsv4-flash.slurm` → `scripts/start_vllm_background.sh`.
 - **Named tunnel** for a stable hostname. Domain available: `hyak.harvest.hurrypeng.cc`. Needs CNAME `hyak.harvest` → `<TUNNEL_UUID>.cfargotunnel.com` plus `CLOUDFLARE_TUNNEL_TOKEN` + `PUBLIC_NAMED_URL=https://hyak.harvest.hurrypeng.cc` in `secrets.env`, then resubmit 04. No A record to Hyak (no public IP). Do not CNAME to the current `*.trycloudflare.com`.
 - Writeup.
 - Home disk quota (~11G) still trips vLLM usage-stats (non-fatal).
+- **Cache-read token counts in API/UI:** vLLM 0.26 only fills
+  `usage.prompt_tokens_details.cached_tokens` when
+  `--enable-prompt-tokens-details` is set (default false). Live job 38852790
+  does not pass it — raw vLLM returns `prompt_tokens_details: null`. Flag is
+  now in the serve scripts; needs a resubmit to take effect. Not LiteLLM
+  response-cache (`cache_hit`).
 
 ## Git
 
