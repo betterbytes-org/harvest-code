@@ -2,11 +2,13 @@
 
 ## Where We Left Off
 
-APC job **38852790** RUNNING on **g3129**. Tunnel:
-`https://kathy-buck-when-excluded.trycloudflare.com` (2026-08-25T23:32:55Z).
-`enable_prefix_caching=True`, KV 6,233,763 tokens. Old **38809797** cancelled
-only. Dreamer jobs left alone. Do not rotate `LITELLM_VIRTUAL_KEY`. Do not
-drop LiteLLM Postgres.
+Reporting restart is live. Job **38886754** `RUNNING` on **g3129** with
+`--enable-prefix-caching` and `--enable-prompt-tokens-details`. Old job
+**38852790** cancelled only. Dreamer jobs left alone. Do not rotate
+`LITELLM_VIRTUAL_KEY`. Do not drop LiteLLM Postgres.
+
+Public URL (quick tunnel, 2026-08-26T20:43:17Z):
+https://western-doll-rick-rrp.trycloudflare.com
 
 ## Decisions
 
@@ -14,6 +16,8 @@ drop LiteLLM Postgres.
 - 1M concurrency: KV pool ~6.26M tokens; cap **4** (`VLLM_MAX_NUM_SEQS`).
 - APC: vLLM 0.26 defaults hybrid APC off; we now pass `--enable-prefix-caching`.
   Same GPU KV pool (no extra HBM allocation).
+- Cache-read tokens: vLLM 0.26 fills `usage.prompt_tokens_details.cached_tokens`
+  only with `--enable-prompt-tokens-details` (now on 38886754).
 - Quick tunnel is **not** a stable hostname.
 - Do not drop the LiteLLM Postgres DB (mentor UI admin lives there).
 - Do not start a second serve job while another job holds PGDATA.
@@ -29,8 +33,9 @@ drop LiteLLM Postgres.
 
 ## Next step
 
-APC job is live. Handoff: `PROGRESS.md`. Optional: named Cloudflare
-tunnel (`hyak.harvest.hurrypeng.cc`); writeup.
+Optional: named Cloudflare tunnel (`hyak.harvest.hurrypeng.cc`); writeup.
+Confirm a client request shows `prompt_tokens_details.cached_tokens` on a
+prefix hit.
 
 ## Tentative
 
@@ -38,6 +43,8 @@ tunnel (`hyak.harvest.hurrypeng.cc`); writeup.
 - APC off on 38809797: `enable_prefix_caching=False`; 0.0% prefix hits.
 - Submitted 38852790 at 2026-08-25 ~23:12Z from klone-login03 after adding
   `--enable-prefix-caching`.
-- Cache-read tokens missing: vLLM emits `prompt_tokens_details: null` unless
-  `--enable-prompt-tokens-details`. Flag added to serve scripts; live job
-  not restarted.
+- Cache-read tokens missing on 38852790: vLLM emitted
+  `prompt_tokens_details: null` without `--enable-prompt-tokens-details`.
+- 38886754 boot: `enable_prompt_tokens_details=True`,
+  `enable_prefix_caching=True`, `max_model_len=1010000`, GPU KV 6,233,763.
+  `/v1/models` 200; `/health/readiness` 200; `/ui` 307.
