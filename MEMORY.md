@@ -2,21 +2,22 @@
 
 ## Where We Left Off
 
-Service was down because **39581377** hit its 3-day TIME LIMIT at
-2026-09-07T11:33. Successor **39581518** is a 7-day job so Slurm holds it
-until after September8_Maintenance (StartTime 2026-09-09T04:00). Old
-quick tunnel `louisville-participating-rat-sms` is dead.
+Always-on API is **up**. 7-day job **39581518** `RUNNING` on **g3130**
+from **2026-09-08T17:23:25** until **2026-09-15T17:23:25**. Successor
+**39848491** is pending `afterany:39581518` (auto-chain). Same virtual
+key. Do not rotate `LITELLM_VIRTUAL_KEY`. Do not drop LiteLLM Postgres.
 
-Bridge job **39794675** `RUNNING` on **g3130** until **2026-09-08T03:29**
-(`--time=8:00:00` so it ends before maint 04:00). Same virtual key.
-Do not rotate `LITELLM_VIRTUAL_KEY`. Do not drop LiteLLM Postgres.
+Public URL (quick tunnel, 2026-09-09T00:48:37Z):
+https://ceiling-manufacture-surge-sponsors.trycloudflare.com
 
-Public URL (quick tunnel, 2026-09-08T03:06:57Z):
-https://memories-amenities-drill-queries.trycloudflare.com
+September8_Maintenance is gone (`scontrol` has no Sept reservation;
+next MAGNETIC ALL_NODES is October13_Maintenance 2026-10-13T09:00).
+Bridge **39794675** TIMED OUT at 2026-09-08T03:29. Old quick tunnels
+`louisville-participating-rat-sms` and
+`memories-amenities-drill-queries` are dead.
 
-After 03:29 tonight the API goes down again until 39581518 starts
-2026-09-09T04:00 (plus ~30 min boot). To stop the API, scancel running
-and pending 04 jobs (39794675 and 39581518).
+To stop the API, scancel running and pending 04 jobs (39581518 and
+39848491).
 
 ## Decisions
 
@@ -40,8 +41,8 @@ and pending 04 jobs (39794675 and 39581518).
 
 ## Next step
 
-After Sept 9 04:00, confirm 39581518 boots and write the new URL.
 Optional: named Cloudflare tunnel (`hyak.harvest.hurrypeng.cc`).
+Before 2026-09-15T17:23, confirm 39848491 starts and write the new URL.
 
 ## Tentative
 
@@ -56,3 +57,9 @@ Optional: named Cloudflare tunnel (`hyak.harvest.hurrypeng.cc`).
 - 39794675 boot: APC + prompt-tokens-details, KV 6,233,763.
   `/v1/models` 200; `/health/readiness` 200; `/ui` 307. Key suffix
   `2xPzoA` unchanged.
+- September8_Maintenance reservation was gone by 2026-09-08T17:23;
+  39581518 started then instead of 2026-09-09T04:00.
+- 39581518 boot ~25 min: KV 6,233,763; LiteLLM `/health/readiness` 200
+  (db connected); `/v1/models` 200 `qwen3.8-27b`; `/ui` 307; public
+  tunnel + chat 200. Key suffix `2xPzoA` unchanged. Stale
+  `postmaster.pid` (260417) delayed Postgres ~1 min then released.

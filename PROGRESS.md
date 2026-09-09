@@ -1,4 +1,4 @@
-# HARVEST progress (2026-09-07)
+# HARVEST progress (2026-09-08)
 
 Handoff for a new Claude / agent session. Canonical memory: `MEMORY.md`.
 Hyak playbook leftovers: `infra/hyak/state/CONTINUE-1M.txt` (stale job id — ignore).
@@ -7,15 +7,15 @@ Hyak playbook leftovers: `infra/hyak/state/CONTINUE-1M.txt` (stale job id — ig
 
 | | |
 |---|---|
-| Slurm | **39794675** `RUNNING` on **g3130**, 2× H200, wall **8h** (ends 2026-09-08T03:29, before Sept 8 04:00 maint) |
-| Successor | **39581518** PD until **2026-09-09T04:00** (7-day wall overlaps September8_Maintenance) |
+| Slurm | **39581518** `RUNNING` on **g3130**, 2× H200, wall **7 days** (ends 2026-09-15T17:23) |
+| Successor | **39848491** PD `afterany:39581518` |
 | Model | `Qwen/Qwen3.8-27B` served as **`qwen3.8-27b`** |
 | Context | YaRN 1M — `max_model_len=1010000` (`infra/hyak/env/qwen38-yarn-1m.json`) |
 | KV | **6,233,763** tokens (enough for ~6 full 1M seqs) |
 | Concurrency | `--max-num-seqs=4` |
 | APC | **on** — `--enable-prefix-caching` (vLLM 0.26 defaults this **off** for hybrid Qwen3.8) |
 | Cache reporting | **on** — `--enable-prompt-tokens-details` |
-| Public URL | https://memories-amenities-drill-queries.trycloudflare.com |
+| Public URL | https://ceiling-manufacture-surge-sponsors.trycloudflare.com |
 
 Always re-read `infra/hyak/state/public-url.env` after a restart. Quick tunnels change on every `cloudflared` / job restart. Trust the file only if its timestamp is after the new job’s tunnel write.
 
@@ -48,7 +48,8 @@ Hyak GPU nodes cannot `sbatch` (`Invalid account or account/partition`). `script
 4. Agent-side “send less context” was **not** done (user said later).
 5. Resubmitted **38886754** with `--enable-prompt-tokens-details`. Confirmed both flags. Public URL was https://western-doll-rick-rrp.trycloudflare.com. Timed out 2026-09-02T13:08:54; USR1 never queued a successor.
 6. 2026-09-04: 7-day resubmit **39581357** sat PD `Reserved for maintenance`; scancelled. Submitted **39581377** with `--time=3-00:00:00`. Booted on g3127. Successor **39581518** queued from login. URL was https://louisville-participating-rat-sms.trycloudflare.com.
-7. 2026-09-07: **39581377** TIMED OUT at 11:33. **39581518** held until 2026-09-09T04:00. Submitted 8h bridge **39794675** on g3130. New URL: https://memories-amenities-drill-queries.trycloudflare.com. `/v1/models` 200; `/health/readiness` 200; `/ui` 307. Virtual key unchanged. Extra chain **39794676** scancelled.
+7. 2026-09-07: **39581377** TIMED OUT at 11:33. Submitted 8h bridge **39794675** (TIMEOUT 03:29 Sept 8).
+8. 2026-09-08: Maint reservation gone. **39581518** started 17:23 on g3130. URL: https://ceiling-manufacture-surge-sponsors.trycloudflare.com. `/v1/models` 200; `/health/readiness` 200; `/ui` 307. Virtual key unchanged. Successor **39848491** queued.
 
 ## Not done
 
@@ -57,7 +58,7 @@ Hyak GPU nodes cannot `sbatch` (`Invalid account or account/partition`). `script
 - Home disk quota (~11G) still trips vLLM usage-stats (non-fatal).
 - Confirm a prefix-hit request reports `usage.prompt_tokens_details.cached_tokens`
   (flag is live; not yet client-verified). Not LiteLLM response-cache (`cache_hit`).
-- After Sept 9 04:00, confirm **39581518** starts and publish the new tunnel URL (bridge 39794675 dies 03:29 Sept 8).
+- After 39581518 ends 2026-09-15T17:23, confirm **39848491** starts and publish the new tunnel URL.
 
 ## Git
 
